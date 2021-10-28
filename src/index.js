@@ -501,9 +501,11 @@ async function importStringAsKey (pem, algorithm) {
   )
 }
 
-const all = {
+const crypto = {
   encrypt,
   decrypt,
+  encryptJSON,
+  decryptJSON,
   generateKeys,
   generateRSAKeyPair,
   generateECDSAKeyPair,
@@ -516,4 +518,4 @@ const all = {
 // Expose crypto as a plugin
 // NGN.crypto = all
 
-export { all as default }
+export { crypto as default }

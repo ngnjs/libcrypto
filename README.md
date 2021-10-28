@@ -72,3 +72,34 @@ const decrypted = await crypto.decrypt(encrypted, encryptionKey)
 Anyone who obtains the encryption key can decrypt data.
 
 This library produces content that contains a salt, iv, and cipher content `${salt}-${iv}-${cipher}`. This library will automatically decrypt tokens in this format, assuming the appropriate encryption key is provided. Other libraries can decrypt tokens by parsing the `salt`, `iv`, and `cipher`, then performing decryption using these parts and the shared encryption key.
+
+## Public Key Encryption/Private Key Decryption
+
+It is possible to encrypt content with a public key and decrypt it with the corresponding private key. This produces/uses RSA-OAEP keys (SHA-256).
+
+```javascript
+const { publicKey, privateKey } = await crypto.generateRSAKeyPair()
+const source = 'crypto makes things hard to read'
+const encrypted = await crypto.encrypt(source, publicKey)
+const decrypted = await crypto.decrypt(encrypted, privateKey)
+```
+
+Typically this is used to encrypt communications. The client receives the private key while the server stores the public key. The server encrypts data with the public key before sending it to the client. The client decrypts data using the private key.
+
+## Encrypt/Decrypt JSON
+
+These convenience methods help manage encryption of JSON objects.
+
+```javascript
+const obj = { example: true }
+const encObj = await crypto.encryptJSON(obj, encryptionKey)
+const decObj = await crypto.decryptJSON(encObj, encryptionKey)
+
+// Using public/private keys (RSA-OAEP)
+const obj = { example: true }
+const { publicKey, privateKey } = await crypto.generateRSAKeyPair()
+const encObj = await crypto.encryptJSON(obj, publicKey)
+const decObj = await crypto.decryptJSON(encObj, privateKey)
+```
+
+These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
