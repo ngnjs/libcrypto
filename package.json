@@ -1,0 +1,105 @@
+{
+  "name": "@ngnjs/crypto",
+  "version": "1.0.0-alpha.1",
+  "description": "A simple cryptography plugin for NGN.",
+  "type": "module",
+  "author": "Corey Butler",
+  "private": false,
+  "license": "MIT",
+  "homepage": "https://github.com/ngnjs/crypto",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ngnjs/crypto.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ngnjs/crypto/issues"
+  },
+  "main": "./src/index.js",
+  "module": "index.js",
+  "exports": {
+    ".": {
+      "import": "./index.js"
+    }
+  },
+  "browser": "./index.js",
+  "peerDependencies": {
+    "ngn": "^2.0.0-alpha.10",
+    "@ngnjs/plugin": ">=1.0.0-alpha.9",
+    "@ngnjs/libnet-node": ">=1.0.0-alpha",
+    "@ngnjs/libdata": ">=1.0.0-alpha.1"
+  },
+  "devDependencies": {
+    "@author.io/dev": "^1.1.5",
+    "@ngnjs/crypto-debug": "^1.0.0-alpha",
+    "@ngnjs/plugin": "^1.0.0-alpha",
+    "@ngnjs/plugin-debug": "^1.0.0-alpha"
+  },
+  "scripts": {
+    "test": "npm run test:node && npm run test:deno && npm run test:browser && npm run report:syntax && npm run report:size",
+    "start": "dev workspace",
+    "build": "dev build",
+    "test:node": "dev test -rt node tests/*.js",
+    "test:deno": "dev test -rt deno tests/*.js",
+    "test:browser": "dev test -rt browser tests/*.js",
+    "manually": "dev test -rt manual tests/*.js",
+    "report:syntax": "dev report syntax --pretty",
+    "report:size": "dev report size ./.dist/**/*.js ./.dist/**/*.js.map",
+    "report:compat": "dev report compatibility ./src/**/*.js",
+    "report:preview": "npm pack --dry-run && echo \"==============================\" && echo \"This report shows what will be published to the module registry. Pay attention to the tarball contents and assure no sensitive files will be published.\"",
+    "update": "npm update --save --save-dev --save-optional",
+    "ci": "dev test --mode ci --peer -rt browser tests/*.js",
+    "ws": "dev ws"
+  },
+  "dev": {
+    "mode": "source",
+    "replace": {
+      "<#REPLACE_VERSION#>": "package.version"
+    },
+    "autoimport": [
+      "import NGN from 'ngn'"
+    ],
+    "ci": {
+      "verbose": true,
+      "peer": true,
+      "embed": [
+        "@ngnjs/plugin",
+        "@ngnjs/libdata"
+      ],
+      "buildoption": {
+        "preserveEntrySignatures": true
+      },
+      "alias": {
+        "ngn": "/node_modules/ngn/index.js",
+        "@ngnjs/libdata": "/node_modules/@ngnjs/libdata/index.js",
+        "@ngnjs/plugin": "/node_modules/@ngnjs/plugin/index.js",
+        "@ngnjs/crypto": "/app/.dist/crypto/index.js"
+      }
+    },
+    "source": {
+      "volume": [
+        "../core/.dist/ngn:/node_modules/ngn",
+        "../core/src:/source/ngn",
+        "../plugin/.dist/plugin:/node_modules/@ngnjs/plugin",
+        "../plugin/src:/source/@ngnjs/plugin",
+        "../libdata/.dist/libdata:/node_modules/@ngnjs/libdata",
+        "../libdata/src:/source/@ngnjs/libdata"
+      ],
+      "buildoption": {
+        "preserveEntrySignatures": true
+      },
+      "alias": {
+        "ngn": "/node_modules/ngn/index.js",
+        "@ngnjs/plugin": "/source/@ngnjs/plugin/index.js",
+        "@ngnjs/libdata": "/source/@ngnjs/libdata/index.js",
+        "@ngnjs/crypto": "/app/src/index.js"
+      }
+    }
+  },
+  "standard": {
+    "globals": [
+      "globalThis",
+      "window",
+      "global"
+    ]
+  }
+}
