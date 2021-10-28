@@ -1,5 +1,5 @@
 import test from 'tappedout'
-import ngn from 'ngn'
+import NGN from 'ngn'
 import crypto from '@ngnjs/crypto'
 
 test('Sanity', t => {
