@@ -1,23 +1,14 @@
+import PEM from './pem.js'
+import {
+  bufToHex,
+  hexToBuf,
+  nodecrypto,
+  cryptography,
+  runtime
+} from './common.js'
+
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-const BTOA = globalThis.btoa || function (v) { return Buffer.from(v, 'binary').toString('base64') }
-const runtime = globalThis.process !== undefined ? 'node' : (globalThis.hasOwnProperty('Deno') ? 'deno' : 'browser') // eslint-disable-line no-prototype-builtins
-
-let nodecrypto // For Node.js only
-let cryptography = null
-if (runtime === 'node') {
-  ;(async () => {
-    nodecrypto = await import('crypto')
-    try {
-      cryptography = nodecrypto.webcrypto
-    } catch (e) {}
-  })()
-} else {
-  cryptography = globalThis.crypto
-}
-
-const PEM_PUBLIC_KEY_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PUBLIC\sKEY)-{5}/i
-const PEM_PRIVATE_KEY_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PRIVATE\sKEY)-{5}/i
 
 /**
  * Generate a TLS public/private key pair using RSA.
@@ -133,33 +124,6 @@ export async function generateECKeyPair () {
 }
 
 /**
- * Attempts to determine whether a key was created using RSA or
- * ECDSA (Elliptic Curve).
- * @param {string} pem
- * The public or private key, in PEM format.
- * @returns {string}
- * Returns `RSA` or `EC`. Returns `null` if type cannot be determined.
- */
-export function getPEMType (pem) {
-  if (/-{5}(BEGIN RSA.+)-{5}/.test(pem)) {
-    return 'RSA'
-  } else if (/-{5}(BEGIN EC.+)-{5}/.test(pem)) {
-    return 'EC'
-  } else if (!/-{5}(BEGIN.+KEY)-{5}/.test(pem)) {
-    return null
-  }
-
-  // Public RSA keys are approximately 451 characters long
-  // Private RSA keys are approximately 1704 characters long
-  // EC keys are all less than 400 characters long
-  if (pem.length > 425) {
-    return 'RSA'
-  }
-
-  return 'EC'
-}
-
-/**
  * Sign content and return the signature.
  * @param {string} key
  * The signing key (typically a private key)
@@ -184,12 +148,12 @@ export async function sign (pem, data, algorithm) {
     return bufToHex(signature)
   }
 
-  algorithm = { name: getDefaultAlgorithm(pem, algorithm) }
+  algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
   if (algorithm.name === 'ECDSA') {
     algorithm.hash = 'SHA-256'
   }
 
-  const key = await extractKey(pem, algorithm)
+  const key = await PEM.extractKey(pem, algorithm)
   const buffer = await cryptography.subtle.sign(
     algorithm,
     key,
@@ -224,12 +188,12 @@ export async function verify (pem, signature, data, algorithm = 'RSASSA-PKCS1-v1
     return verifier.verify(pem, hexToBuf(signature))
   }
 
-  algorithm = { name: getDefaultAlgorithm(pem, algorithm) }
+  algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
   if (algorithm.name === 'ECDSA') {
     algorithm.hash = 'SHA-256'
   }
 
-  const key = await extractKey(pem, algorithm)
+  const key = await PEM.extractKey(pem, algorithm)
   const verified = await cryptography.subtle.verify(
     algorithm,
     key,
@@ -253,12 +217,12 @@ export async function verify (pem, signature, data, algorithm = 'RSASSA-PKCS1-v1
  * `const ciphertext = await encrypt('my secret text', 'pw')`
  */
 export async function encrypt (plaintext, secret) {
-  if (PEM_PRIVATE_KEY_PATTERN.test(secret)) {
+  if (PEM.isPrivateKey(secret)) {
     throw new Error('Encryption requires a public key (a private key was specified)')
   }
 
   if (runtime === 'node' && !cryptography) {
-    if (PEM_PUBLIC_KEY_PATTERN.test(secret)) {
+    if (PEM.isPublicKey(secret)) {
       const buffer = Buffer.from(plaintext, 'utf8')
       return nodecrypto.publicEncrypt(secret, buffer).toString('base64')
     }
@@ -273,8 +237,8 @@ export async function encrypt (plaintext, secret) {
   }
 
   // If a PEM public key is specified, use it to encrypt the data
-  if (PEM_PUBLIC_KEY_PATTERN.test(secret)) {
-    const pemKey = await extractKey(secret, { name: 'RSA-OAEP', hash: 'SHA-256' })
+  if (PEM.isPublicKey(secret)) {
+    const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP', hash: 'SHA-256' })
     const ciphertext = await cryptography.subtle.encrypt({ name: 'RSA-OAEP' }, pemKey, encoder.encode(plaintext))
 
     return bufToHex(ciphertext)
@@ -301,14 +265,14 @@ export async function encrypt (plaintext, secret) {
  * `const plaintext = await decrypt(ciphertext, 'pw')`
  */
 export async function decrypt (cipher, secret) {
-  if (PEM_PUBLIC_KEY_PATTERN.test(secret)) {
+  if (PEM.isPublicKey(secret)) {
     throw new Error('Decryption requires a private key (a public key was specified)')
   }
 
   const [salt, iv, data] = cipher.split('-').map(hexToBuf)
 
   if (runtime === 'node' && !cryptography) {
-    if (PEM_PRIVATE_KEY_PATTERN.test(secret)) {
+    if (PEM.isPrivateKey(secret)) {
       const buffer = Buffer.from(cipher, 'base64')
       return nodecrypto.privateDecrypt({ key: secret }, buffer).toString('utf8')
     }
@@ -320,8 +284,8 @@ export async function decrypt (cipher, secret) {
   }
 
   // If a PEM private key is specified, use it to decrypt the cipher
-  if (PEM_PRIVATE_KEY_PATTERN.test(secret)) {
-    const pemKey = await extractKey(secret, { name: 'RSA-OAEP' })
+  if (PEM.isPrivateKey(secret)) {
+    const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP' })
     const buffer = await cryptography.subtle.decrypt({ name: 'RSA-OAEP' }, pemKey, hexToBuf(cipher))
     const data = new Uint8Array(buffer)
     return decoder.decode(data)
@@ -373,8 +337,8 @@ async function generateKeyPair (algorithm, type = '') {
     ['sign', 'verify']
   )
 
-  const privateKey = await pemEncodedPrivateKey(keypair.privateKey, type)
-  const publicKey = await pemEncodedPublicKey(keypair.publicKey, type)
+  const privateKey = await PEM.encodePrivateKey(keypair.privateKey, type)
+  const publicKey = await PEM.encodePublicKey(keypair.publicKey, type)
 
   return { privateKey, publicKey }
 }
@@ -394,110 +358,6 @@ async function Key (passphrase, salt, hash = 'SHA-256') {
   return { key, salt }
 }
 
-async function extractKey (pem, algorithm) {
-  const pemtype = getPEMType(pem)
-
-  // Use the specified algorithm or appropriate defaults for RSA/ECDSA
-  return pemtype === 'RSA'
-    ? await importStringAsRSAKey(pem, getDefaultAlgorithm(pem, algorithm, pemtype).name)
-    : await importStringAsECDSAKey(pem)
-}
-
-function getDefaultAlgorithm (pem, algorithm, pemtype) {
-  if (algorithm) {
-    return algorithm
-  }
-
-  pemtype = pemtype || getPEMType(pem)
-
-  return pemtype === 'RSA' ? 'RSASSA-PKCS1-v1_5' : 'P-256'
-}
-
-function bufToHex (buffer) {
-  return Array.prototype.slice
-    .call(new Uint8Array(buffer))
-    .map(x => [x >> 4, x & 15])
-    .map(ab => ab.map(x => x.toString(16)).join(''))
-    .join('')
-}
-
-function hexToBuf (str) {
-  return new Uint8Array(str.match(/.{2}/g).map(byte => parseInt(byte, 16)))
-}
-
-function arrayBufferToString (buffer) {
-  return String.fromCharCode.apply(null, new Uint8Array(buffer))
-}
-
-function stringToArrayBuffer (str) {
-  const buf = new ArrayBuffer(str.length)
-  const bufView = new Uint8Array(buf)
-  for (let i = 0, strLen = str.length; i < strLen; i++) {
-    bufView[i] = str.charCodeAt(i)
-  }
-  return buf
-}
-
-function pemEncode (label, data, type = '') {
-  const base64encoded = BTOA(data)
-  const base64encodedWrapped = base64encoded.replace(/(.{64})/g, '$1\n')
-
-  label = (type.length > 0 ? type.trim().toUpperCase() + ' ' : '') + label
-  return `-----BEGIN ${label}-----\n${base64encodedWrapped}\n-----END ${label}-----`
-}
-
-function pemDecode (key) {
-  const pem = key.replace(/(-{5}([A-Za-z\s]+)KEY-{5})/gi, '').trim()
-  const binaryDerString = globalThis.atob(pem)
-
-  return stringToArrayBuffer(binaryDerString)
-}
-
-async function pemEncodedPrivateKey (key, type = '') {
-  return pemEncode('PRIVATE KEY', await exportKeyAsString('pkcs8', key), type)
-}
-
-async function pemEncodedPublicKey (key, type = '') {
-  return pemEncode('PUBLIC KEY', await exportKeyAsString('spki', key), type)
-}
-
-async function exportKeyAsString (format, key) {
-  return arrayBufferToString(await cryptography.subtle.exportKey(format, key))
-}
-
-async function importStringAsRSAKey (pem, algorithm = 'RSASSA-PKCS1-v1_5', hash = 'SHA-256') {
-  algorithm = typeof algorithm === 'object' ? algorithm : { name: algorithm, hash }
-  return importStringAsKey(pem, algorithm)
-}
-
-async function importStringAsECDSAKey (pem, namedCurve = 'P-256') {
-  return importStringAsKey(pem, { name: 'ECDSA', namedCurve })
-}
-
-async function importStringAsKey (pem, algorithm) {
-  const privateKey = pem.indexOf('PRIVATE KEY') > 0
-  const encoding = privateKey ? 'pkcs8' : 'spki'
-  const usage = []
-
-  // RSA-OAEP keys are used for encryption/decryption.
-  // All other keys are used for signing/verifying content.
-  if (algorithm.name === 'RSA-OAEP') {
-    usage.push(privateKey ? 'decrypt' : 'encrypt')
-  } else {
-    usage.push(privateKey ? 'sign' : 'verify')
-  }
-
-  // Attempt to import the string as a signing key.
-  // If that fails, import as a verification key.
-  return await cryptography.subtle.importKey(
-    encoding,
-    pemDecode(pem),
-    algorithm,
-    true,
-    usage
-  )
-}
-
 const crypto = {
   encrypt,
   decrypt,
@@ -507,7 +367,7 @@ const crypto = {
   generateRSAKeyPair,
   generateECDSAKeyPair,
   generateECKeyPair,
-  getPEMType,
+  PEM,
   sign,
   verify
 }
@@ -515,4 +375,4 @@ const crypto = {
 // Expose crypto as a plugin
 // NGN.crypto = all
 
-export { crypto as default }
+export { crypto as default, PEM }
