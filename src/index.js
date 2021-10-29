@@ -1,10 +1,7 @@
-import Reference from '@ngnjs/plugin'
-
-const NGN = new Reference()
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
 const BTOA = globalThis.btoa || function (v) { return Buffer.from(v, 'binary').toString('base64') }
-const { runtime } = NGN
+const runtime = globalThis.process !== undefined ? 'node' : (globalThis.hasOwnProperty('Deno') ? 'deno' : 'browser') // eslint-disable-line no-prototype-builtins
 
 let nodecrypto // For Node.js only
 let cryptography = null

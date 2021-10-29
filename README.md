@@ -1,13 +1,13 @@
 <h1 align="center">NGN Cryptography<br/><img src="https://img.shields.io/npm/v/@ngnjs/crypto?label=%40ngnjs/crypto&logo=npm&style=social"/></h1>
-<div align="center"><em>A plugin for <a href="https://github.com/ngnjs/ngn">NGN</a></em></div><br/>
+<div align="center"><em>A part of the <a href="https://github.com/ngnjs/ngn">NGN</a> ecosystem.</em></div><br/>
 
 Live examples on [codepen](https://codepen.io/coreybutler/pen/mdMwQQb).
 
-The NGN crypto plugin provides simple cryptographic building blocks:
+The NGN crypto library provides simple cryptographic building blocks:
 
 1. Generate RSA or ECDSA Private/Public Keypairs (PEM)
-1. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
-1. Encrypt/Decrypt Content (AES)
+2. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
+3. Encrypt/Decrypt Content (AES)
 
 ## Generate PEM Keypairs
 
@@ -15,10 +15,8 @@ NGN crypto can generate RSA or ECDSA (EC) private and public keypairs.
 
 ```javascript
 // Browser/Deno Runtime
-import NGN from 'https://cdn.jsdelivr.net/npm/ngn'
 import crypto from 'https://cdn.jsdelivr.net/npm/@ngnjs/crypto'
 // Node Runtime
-// import NGN from 'ngn'
 // import crypto from '@ngnjs/crypto'
 
 // RSA Keypairs default to 2048-bit encryption using SHA-256
