@@ -15,13 +15,13 @@ test('Content Signing & Verification', async t => {
 
   const { publicKey, privateKey } = await crypto.generateKeys().catch(t.abort)
   const content = 'crypto makes things safe'
-  const signature = await crypto.sign(privateKey, content).catch(t.abort)
-  const verified = await crypto.verify(publicKey, signature, content).catch(t.abort)
+  const signature = await crypto.sign(content, privateKey).catch(t.abort)
+  const verified = await crypto.verify(content, signature, publicKey).catch(t.abort)
 
   t.expect(true, verified, 'signing and verification succeeds for generated signature')
 
   const keypairs = await crypto.generateKeys().catch(t.abort)
-  const invalid = await crypto.verify(keypairs.publicKey, signature, content).catch(t.abort)
+  const invalid = await crypto.verify(content, signature, keypairs.publicKey).catch(t.abort)
   t.expect(false, invalid, 'verification fails for incorrect private key')
 
   t.end()

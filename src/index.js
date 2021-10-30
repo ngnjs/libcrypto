@@ -138,7 +138,7 @@ export async function generateECKeyPair () {
  * @returns {string}
  * Returns the base64 signature.
  */
-export async function sign (pem, data, algorithm) {
+export async function sign (data, pem, algorithm) {
   if (runtime === 'node' && !cryptography) {
     const signer = nodecrypto.createSign('SHA256')
     signer.update(data)
@@ -180,7 +180,7 @@ export async function sign (pem, data, algorithm) {
  * @returns {boolean}
  * Indicates the signature is valid.
  */
-export async function verify (pem, signature, data, algorithm = 'RSASSA-PKCS1-v1_5') {
+export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1_5') {
   if (runtime === 'node' && !cryptography) {
     const verifier = nodecrypto.createVerify('SHA256')
     verifier.update(data)
