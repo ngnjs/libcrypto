@@ -46,8 +46,8 @@ Signing/verification currently uses RSA keys. ECDSA support may be available in 
 ```javascript
 const { publicKey, privateKey } = await crypto.generateKeys()
 const content = 'crypto makes things safe'
-const signature = await crypto.sign(privateKey, content)
-const verified = await crypto.verify(publicKey, signature, content)
+const signature = await crypto.sign(content, privateKey)
+const verified = await crypto.verify(content, signature, publicKey)
 ```
 
 In the example above, a private key is used to sign content. This produces a signature, which can be transmitted alongside the content. The receiver of the content uses the signature and their public key to verify the content.
@@ -61,10 +61,10 @@ Signing/verification relies on distribution of public keys _prior_ to API commun
 The encrypt/decrypt methods provide a way to encrypt text using a shared encryption key.
 
 ```javascript
-const encryptionKey = 'secret code'
+const sharedKey = 'secret code'
 const source = 'crypto makes things hard to read'
-const encrypted = await crypto.encrypt(source, encryptionKey)
-const decrypted = await crypto.decrypt(encrypted, encryptionKey)
+const encrypted = await crypto.encrypt(source, sharedKey)
+const decrypted = await crypto.decrypt(encrypted, sharedKey)
 ```
 
 Anyone who obtains the encryption key can decrypt data.
