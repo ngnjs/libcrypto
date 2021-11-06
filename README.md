@@ -108,20 +108,24 @@ These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
 
 ## Exported Functions
 
-The following methods are exported by this module:
+The following methods are importable from this module:
 
-- encrypt
-- decrypt
-- encryptJSON
-- decryptJSON
-- encryptionAlgorithm
-- generateKeys
-- generateRSAKeyPair
-- generateECDSAKeyPair
-- generateECKeyPair
-- sign
-- verify
-- PEM
+```javascript
+import {
+  encrypt,
+  decrypt,
+  encryptJSON,
+  decryptJSON,
+  encryptionAlgorithm,
+  generateKeys,
+  generateRSAKeyPair,
+  generateECDSAKeyPair,
+  generateECKeyPair,
+  sign,
+  verify,
+  PEM
+} from '@ngnjs/libcrypto'
+```
 
 Most of these are defined in the examples above. The remainder are documented below:
 
