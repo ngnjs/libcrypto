@@ -3,8 +3,6 @@ import {
   nodecrypto,
   cryptography,
   runtime,
-  arrayBufferToString,
-  stringToArrayBuffer,
   bufToBase64,
   base64ToBuf,
   createBase64Cipher
@@ -166,7 +164,7 @@ export async function sign (data, pem, algorithm) {
     encoder.encode(data)
   )
 
-  return arrayBufferToString(buffer)
+  return bufToBase64(buffer)
 }
 
 /**
@@ -204,7 +202,7 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
   const verified = await cryptography.subtle.verify(
     algorithm,
     key,
-    stringToArrayBuffer(signature),
+    base64ToBuf(signature),
     encoder.encode(data)
   )
 
