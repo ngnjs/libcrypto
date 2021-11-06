@@ -137,15 +137,15 @@ Given a shared encryption key or public/private key (PEM), this method determine
 
 This is an object/namespace containing several PEM-specific functions:
 
-1. `isKey(string)`_boolean_
-2. `isPrivateKey(string)`_boolean_
-3. `isPublicKey(string)`_boolean_
-4. `typeOf(string)`_string_ (`RSA` or `EC`)
-5. *`extractKey(string, algorithm)`_CryptoKey_
-6. *`encode(label, code, type)`_string_ (PEM)
-7. *`decode(key)`_ArrayBuffer_
-8. *`encodePrivateKey(key, type)`_string_ Encodes a private PEM
-9. *`encodePublicKey(key, type)`_string_ Encodes a public PEM
-10. *`getDefaultAlgorithm(pem, algorithm, type)`_string_ RSA/RSASSA-PKCS1-v1_5/P-256
+1. `isKey(string)` _boolean_
+2. `isPrivateKey(string)` _boolean_
+3. `isPublicKey(string)` _boolean_
+4. `typeOf(string)` _string_ (`RSA` or `EC`)
+5. *`extractKey(string, algorithm)` _CryptoKey_
+6. *`encode(label, code, type)` _string_ (PEM)
+7. *`decode(key)` _ArrayBuffer_
+8. *`encodePrivateKey(key, type)` _string_ Encodes a private PEM
+9. *`encodePublicKey(key, type)` _string_ Encodes a public PEM
+10. *`getDefaultAlgorithm(pem, algorithm, type)` _string_ RSA/RSASSA-PKCS1-v1_5/P-256
 
 All functions marked with `*` are designed primarily for internal use, but are exposed to provide granular control over PEM creation/consumption.
