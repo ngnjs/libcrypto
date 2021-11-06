@@ -1,6 +1,6 @@
 import test from 'tappedout'
 import NGN from 'ngn'
-import crypto from '@ngnjs/crypto'
+import crypto from '@ngnjs/libcrypto'
 
 const x = NGN.runtime // Prevent test suite import from conflicting with plugin in Node.js
 

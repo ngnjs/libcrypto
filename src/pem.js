@@ -22,9 +22,9 @@ export const isKey = pem => PEM_KEY_PATTERN.test(pem)
  * Returns `RSA` or `EC`. Returns `null` if type cannot be determined.
  */
 export const typeOf = pem => {
-  if (/-{5}(BEGIN RSA.+)-{5}/.test(pem)) {
+  if (/-{5}(BEGIN (ENCRYPTED\s)?RSA.+)-{5}/.test(pem)) {
     return 'RSA'
-  } else if (/-{5}(BEGIN EC.+)-{5}/.test(pem)) {
+  } else if (/-{5}(BEGIN (ENCRYPTED\s)?EC.+)-{5}/.test(pem)) {
     return 'EC'
   } else if (!/-{5}(BEGIN.+KEY)-{5}/.test(pem)) {
     return null
@@ -59,9 +59,8 @@ export const encode = (label, data, type = '') => {
 
 export const decode = key => {
   const pem = key.replace(/(-{5}([A-Za-z\s]+)KEY-{5})/gi, '').trim()
-  const binaryDerString = globalThis.atob(pem)
-
-  return stringToArrayBuffer(binaryDerString)
+  // binaryDerString = globalThis.atob(pem)
+  return stringToArrayBuffer(globalThis.atob(pem))
 }
 
 export const encodePrivateKey = async (key, type = '') => encode('PRIVATE KEY', await exportKeyAsString('pkcs8', key), type)

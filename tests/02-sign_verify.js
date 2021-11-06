@@ -1,6 +1,6 @@
 import test from 'tappedout'
 import NGN from 'ngn'
-import crypto from '@ngnjs/crypto'
+import crypto from '@ngnjs/libcrypto'
 
 test('Content Signing & Verification', async t => {
   // TODO: Compare the Deno runtime version to the active one.

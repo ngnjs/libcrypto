@@ -1,14 +1,21 @@
 import PEM from './pem.js'
 import {
-  bufToHex,
-  hexToBuf,
   nodecrypto,
   cryptography,
-  runtime
+  runtime,
+  arrayBufferToString,
+  stringToArrayBuffer,
+  bufToBase64,
+  base64ToBuf,
+  createBase64Cipher
 } from './common.js'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
+const SALT_LENGTH = 16
+const IV_LENGTH = runtime === 'deno' ? 16 : 12
+const AUTH_TAG_LENGTH = 16
+const ENCRYPTION_ALGORITHM = runtime === 'deno' ? 'AES-CBC' : 'AES-GCM'
 
 /**
  * Generate a TLS public/private key pair using RSA.
@@ -144,8 +151,7 @@ export async function sign (data, pem, algorithm) {
     signer.update(data)
     signer.end()
 
-    const signature = signer.sign(pem)
-    return bufToHex(signature)
+    return signer.sign(pem).toString('base64')
   }
 
   algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
@@ -160,7 +166,7 @@ export async function sign (data, pem, algorithm) {
     encoder.encode(data)
   )
 
-  return bufToHex(buffer)
+  return arrayBufferToString(buffer)
 }
 
 /**
@@ -185,7 +191,8 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
     const verifier = nodecrypto.createVerify('SHA256')
     verifier.update(data)
     verifier.end()
-    return verifier.verify(pem, hexToBuf(signature))
+
+    return verifier.verify(pem, signature, 'base64')
   }
 
   algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
@@ -197,7 +204,7 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
   const verified = await cryptography.subtle.verify(
     algorithm,
     key,
-    hexToBuf(signature),
+    stringToArrayBuffer(signature),
     encoder.encode(data)
   )
 
@@ -207,12 +214,13 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
 /**
  * Encrypts plaintext using AES-GCM with supplied secret/key, for decryption with decrypt().
  * If a PEM private key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
+ * @warning Some versions of Deno do not support AES-GCM. AES-CBC is used instead.
  * @param   {String} plaintext
  * Plaintext to be encrypted.
  * @param   {String} secret
  * Secret or PEM key to encrypt plaintext.
  * @returns {String}
- * Encrypted ciphertext.
+ * Base64 encrypted cipher text.
  * @example
  * `const ciphertext = await encrypt('my secret text', 'pw')`
  */
@@ -224,16 +232,21 @@ export async function encrypt (plaintext, secret) {
   if (runtime === 'node' && !cryptography) {
     if (PEM.isPublicKey(secret)) {
       const buffer = Buffer.from(plaintext, 'utf8')
-      return nodecrypto.publicEncrypt(secret, buffer).toString('base64')
+      return nodecrypto.publicEncrypt({
+        key: secret,
+        padding: nodecrypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256'
+      }, buffer).toString('base64')
     }
 
-    const iv = nodecrypto.randomBytes(16)
-    const salt = nodecrypto.randomBytes(16)
-    const cipher = nodecrypto.createCipheriv('aes-256-cbc', simpleKey(secret), iv)
-    let encrypted = cipher.update(plaintext, 'utf-8', 'hex')
-    encrypted += cipher.final('hex')
+    const iv = nodecrypto.randomBytes(IV_LENGTH)
+    const salt = nodecrypto.randomBytes(SALT_LENGTH)
+    const cipher = nodecrypto.createCipheriv('aes-256-gcm', simpleKey(secret), iv, { authTagLength: AUTH_TAG_LENGTH })
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+    const tag = cipher.getAuthTag()
 
-    return `${bufToHex(salt).replace(/-/g, '+').replace(/_/g, '/')}-${bufToHex(iv).replace(/-/g, '+').replace(/_/g, '/')}-${encrypted.replace(/-/g, '+').replace(/_/g, '/')}`
+    return Buffer.concat([salt, iv, tag, encrypted]).toString('base64')
+    // return createBase64Cipher(salt, iv, encrypted, tag)
   }
 
   // If a PEM public key is specified, use it to encrypt the data
@@ -241,22 +254,23 @@ export async function encrypt (plaintext, secret) {
     const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP', hash: 'SHA-256' })
     const ciphertext = await cryptography.subtle.encrypt({ name: 'RSA-OAEP' }, pemKey, encoder.encode(plaintext))
 
-    return bufToHex(ciphertext)
+    return bufToBase64(ciphertext)
   }
 
-  const iv = cryptography.getRandomValues(new Uint8Array(16))
+  const iv = cryptography.getRandomValues(new Uint8Array(IV_LENGTH))
   const data = encoder.encode(plaintext)
   const { key, salt } = await Key(secret)
-  const ciphertext = await cryptography.subtle.encrypt({ name: 'AES-CBC', iv }, key, data)
+  const ciphertext = await cryptography.subtle.encrypt({ name: ENCRYPTION_ALGORITHM, iv }, key, data)
 
-  return `${bufToHex(salt).replace(/-/g, '+').replace(/_/g, '/')}-${bufToHex(iv).replace(/-/g, '+').replace(/_/g, '/')}-${bufToHex(ciphertext).replace(/-/g, '+').replace(/_/g, '/')}`
+  return createBase64Cipher(salt, iv, ciphertext)
 }
 
 /**
  * Decrypts ciphertext encrypted with encrypt() using the supplied secret/key.
  * If a PEM public key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
+ * @warning Some versions of Deno do not support AES-GCM. AES-CBC is used instead.
  * @param   {String} ciphertext
- * Ciphertext to be decrypted.
+ * Base64 ciphertext to be decrypted.
  * @param   {String} secret
  * Secret or PEM key to encrypt plaintext.
  * @returns {String}
@@ -269,31 +283,44 @@ export async function decrypt (cipher, secret) {
     throw new Error('Decryption requires a private key (a public key was specified)')
   }
 
-  const [salt, iv, data] = cipher.split('-').map(hexToBuf)
+  const useNode = runtime === 'node' && !cryptography
+  const isPrivateKey = PEM.isPrivateKey(secret)
+  const encrypted = useNode && !isPrivateKey ? Buffer.from(cipher, 'base64') : base64ToBuf(cipher)
+  const salt = encrypted.slice(0, SALT_LENGTH)
+  const iv = encrypted.slice(salt.byteLength, salt.byteLength + IV_LENGTH)
+  const tag = useNode && !isPrivateKey ? encrypted.slice(salt.byteLength + iv.byteLength, salt.byteLength + iv.byteLength + AUTH_TAG_LENGTH) : null
+  const data = encrypted.slice(salt.byteLength + iv.byteLength + (tag ? tag.byteLength : 0))
 
-  if (runtime === 'node' && !cryptography) {
-    if (PEM.isPrivateKey(secret)) {
+  if (useNode) {
+    if (isPrivateKey) {
       const buffer = Buffer.from(cipher, 'base64')
-      return nodecrypto.privateDecrypt({ key: secret }, buffer).toString('utf8')
+      return nodecrypto.privateDecrypt({
+        key: secret,
+        padding: nodecrypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256'
+      }, buffer).toString('utf8')
     }
 
-    const decipher = nodecrypto.createDecipheriv('aes-256-cbc', simpleKey(secret), iv)
-    let decrypted = decipher.update(bufToHex(data), 'hex', 'utf-8')
-    decrypted = decrypted + decipher.final('utf8')
-    return decrypted.replace(/-/g, '+').replace(/_/g, '/')
+    const decipher = nodecrypto.createDecipheriv('aes-256-gcm', simpleKey(secret), iv, { authTagLength: AUTH_TAG_LENGTH })
+    decipher.setAuthTag(tag)
+
+    const decrypted = decipher.update(data, 'base64', 'utf-8') + decipher.final('utf-8')
+
+    return decrypted
   }
 
   // If a PEM private key is specified, use it to decrypt the cipher
   if (PEM.isPrivateKey(secret)) {
     const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP' })
-    const buffer = await cryptography.subtle.decrypt({ name: 'RSA-OAEP' }, pemKey, hexToBuf(cipher))
+    const buffer = await cryptography.subtle.decrypt({ name: 'RSA-OAEP' }, pemKey, base64ToBuf(cipher))
     const data = new Uint8Array(buffer)
     return decoder.decode(data)
   }
 
   const { key } = await Key(secret, salt)
-  const result = await cryptography.subtle.decrypt({ name: 'AES-CBC', iv }, key, data)
-  return decoder.decode(result).replace(/-/g, '+').replace(/_/g, '/')
+  const decrypted = await cryptography.subtle.decrypt({ name: ENCRYPTION_ALGORITHM, iv }, key, data).catch(e => console.log(`e: ${e.message}`))
+
+  return decoder.decode(decrypted)
 }
 
 /**
@@ -324,11 +351,18 @@ export async function decryptJSON (cipher, secret) {
   return JSON.parse(await decrypt(...arguments))
 }
 
-// Older Node.js only - the md5 hash produces 32 character hash from any
+/**
+ * Identify the encoding type of a secret/key
+ * @param   {String} secret
+ * Secret or PEM key to encrypt plaintext.
+ * @returns {String}
+ * Returns the encryption hash type, such as `rsa256oaep` or `aes256cbc`.
+ */
+export const encryptionAlgorithm = secret => PEM.isKey(secret) ? 'rsa256oaep' : ENCRYPTION_ALGORITHM.toLowerCase().replace('-', '256')
+
+// Older Node.js only - the md5 hash produces a 32 character hash from any
 // encryption key. This is not designed to be a stored secret.
-function simpleKey (secret) {
-  return nodecrypto.createHash('md5').update(secret, 'utf-8').digest('hex')
-}
+const simpleKey = secret => nodecrypto.createHash('md5').update(secret, 'utf8').digest('hex')
 
 async function generateKeyPair (algorithm, type = '') {
   const keypair = await cryptography.subtle.generateKey(
@@ -344,13 +378,12 @@ async function generateKeyPair (algorithm, type = '') {
 }
 
 async function Key (passphrase, salt, hash = 'SHA-256') {
-  salt = salt || cryptography.getRandomValues(new Uint8Array(8))
-  const raw = await cryptography.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey', 'deriveBits'])
+  salt = salt || cryptography.getRandomValues(new Uint8Array(SALT_LENGTH))
+  const secret = await cryptography.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey', 'deriveBits'])
   const key = await cryptography.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations: 10000, hash },
-    raw,
-    { name: 'AES-CBC', length: parseInt(hash.split('-').pop(), 10) },
-    // { name: 'AES-GCM', length: parseInt(hash.split('-').pop(), 10) },
+    secret,
+    { name: ENCRYPTION_ALGORITHM, length: parseInt(hash.split('-').pop(), 10) },
     false,
     ['encrypt', 'decrypt']
   )
@@ -363,6 +396,7 @@ const crypto = {
   decrypt,
   encryptJSON,
   decryptJSON,
+  encryptionAlgorithm,
   generateKeys,
   generateRSAKeyPair,
   generateECDSAKeyPair,

@@ -1,5 +1,5 @@
 import test from 'tappedout'
-import crypto from '@ngnjs/crypto'
+import crypto from '@ngnjs/libcrypto'
 
 test('Sanity', t => {
   t.expect('function', typeof crypto.encrypt, 'encrypt function available')

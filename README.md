@@ -1,5 +1,5 @@
-<h1 align="center">NGN Cryptography<br/><img src="https://img.shields.io/npm/v/@ngnjs/crypto?label=%40ngnjs/crypto&logo=npm&style=social"/></h1>
-<div align="center"><em>A part of the <a href="https://github.com/ngnjs/ngn">NGN</a> ecosystem.</em></div><br/>
+<h1 align="center">NGN Cryptography Library<br/><img src="https://img.shields.io/npm/v/@ngnjs/libcrypto?label=%40ngnjs/libcrypto&logo=npm&style=social"/></h1>
+<div align="center"><em>A standalone library, but part of the <a href="https://github.com/ngnjs/ngn">NGN</a> ecosystem.</em></div><br/>
 
 Live examples on [codepen](https://codepen.io/coreybutler/pen/mdMwQQb).
 
@@ -8,6 +8,8 @@ The NGN crypto library provides simple cryptographic building blocks:
 1. Generate RSA or ECDSA Private/Public Keypairs (PEM)
 2. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
 3. Encrypt/Decrypt Content (AES)
+
+All keys, signatures, and encrypted outputs are Base64 encoded strings (not hex!). Base64 is approximately 25% more efficient than hex (Base16), so the output will be smaller.
 
 ## Generate PEM Keypairs
 
@@ -39,7 +41,7 @@ Public/Private keys are generated in PEM format.
 
 ## Sign & Verify Content
 
-It is possible to sign and verify content using RSA/ECDSA keypairs in the browser and Node.js. Deno does not yet support the proper WebCrypto algorithms for importing keys, but it is on the roadmap. Once Deno adds support, this library will support signing/verifying in Deno.
+It is possible to sign and verify content using RSA/ECDSA keypairs in the browser and Node.js. Deno does not yet support the proper WebCrypto algorithms for importing keys, but it is on their roadmap. Once Deno adds support, this library will support signing/verifying in Deno.
 
 Signing/verification currently uses RSA keys. ECDSA support may be available in some browsers and newer versions of Node.js (17.0.0+).
 
@@ -69,7 +71,9 @@ const decrypted = await crypto.decrypt(encrypted, sharedKey)
 
 Anyone who obtains the encryption key can decrypt data.
 
-This library produces content that contains a salt, iv, and cipher content `${salt}-${iv}-${cipher}`. This library will automatically decrypt tokens in this format, assuming the appropriate encryption key is provided. Other libraries can decrypt tokens by parsing the `salt`, `iv`, and `cipher`, then performing decryption using these parts and the shared encryption key.
+This library produces content that contains a salt, iv, and cipher content `${salt}${iv}${cipher}`. In older Node.js versions which do not support webcrypto, the cipher content is `${salt}${iv}${authTag}${cipher}` where `authTag` is a 16-bit string produced and consumed by encrypt/decypt.
+
+This library will automatically decrypt tokens in the aforementioned format, assuming the appropriate encryption key is provided. Other libraries can decrypt tokens by parsing the `salt `, `iv `, and `cipher` (and `authTag` when appropriate), then performing decryption using these parts and the shared encryption key.
 
 ## Public Key Encryption/Private Key Decryption
 
@@ -101,3 +105,43 @@ const decObj = await crypto.decryptJSON(encObj, privateKey)
 ```
 
 These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
+
+## Exported Functions
+
+The following methods are exported by this module:
+
+- encrypt
+- decrypt
+- encryptJSON
+- decryptJSON
+- encryptionAlgorithm
+- generateKeys
+- generateRSAKeyPair
+- generateECDSAKeyPair
+- generateECKeyPair
+- sign
+- verify
+- PEM
+
+Most of these are defined in the examples above. The remainder are documented below:
+
+**encryptionAlgorithm(secret)**
+
+Given a shared encryption key or public/private key (PEM), this method determines which encryption algorithm is used.
+
+**PEM**
+
+This is an object/namespace containing several PEM-specific functions:
+
+1. `isKey(string)`_boolean_
+2. `isPrivateKey(string)`_boolean_
+3. `isPublicKey(string)`_boolean_
+4. `typeOf(string)`_string_ (`RSA` or `EC`)
+5. *`extractKey(string, algorithm)`_CryptoKey_
+6. *`encode(label, code, type)`_string_ (PEM)
+7. *`decode(key)`_ArrayBuffer_
+8. *`encodePrivateKey(key, type)`_string_ Encodes a private PEM
+9. *`encodePublicKey(key, type)`_string_ Encodes a public PEM
+10. *`getDefaultAlgorithm(pem, algorithm, type)`_string_ RSA/RSASSA-PKCS1-v1_5/P-256
+
+All functions marked with `*` are designed primarily for internal use, but are exposed to provide granular control over PEM creation/consumption.

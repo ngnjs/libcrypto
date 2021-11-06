@@ -1,6 +1,6 @@
 import test from 'tappedout'
 import NGN from 'ngn'
-import crypto from '@ngnjs/crypto'
+import crypto from '@ngnjs/libcrypto'
 
 const PEM_PUBLIC_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PUBLIC\sKEY)-{5}/
 const PEM_PRIVATE_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PRIVATE\sKEY)-{5}/
