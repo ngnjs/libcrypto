@@ -13,10 +13,11 @@ test('Reversible Encryption/Decryption', async t => {
   const decrypted = await crypto.decrypt(encrypted, encryptionKey).catch(t.abort)
   t.expect(source, decrypted, 'Decryption converts cipher to original content')
 
-  const encObj = await crypto.encryptJSON({ source }, encryptionKey).catch(t.abort)
+  const encObj = await crypto.encrypt({ source }, encryptionKey).catch(t.abort)
   t.expect('string', typeof encObj, 'Encrypted object converted to string')
 
-  const decObj = await crypto.decryptJSON(encObj, encryptionKey).catch(t.abort)
+  const decObj = await crypto.decrypt(encObj, encryptionKey).catch(t.abort)
+
   t.expect('object', typeof decObj, 'Decryption yields an object')
   t.expect(source, decObj.source, 'Decrypted object matches original object')
 
@@ -39,10 +40,10 @@ test('Public Key Encryption/Private Key Decryption', async t => {
   const decrypted = await crypto.decrypt(encrypted, privateKey).catch(t.abort)
   t.expect(source, decrypted, 'Private key decryption converts cipher to original content')
 
-  const encObj = await crypto.encryptJSON({ source }, publicKey).catch(t.abort)
+  const encObj = await crypto.encrypt({ source }, publicKey).catch(t.abort)
   t.expect('string', typeof encObj, 'Pub/Priv key encrypted object converted to string')
 
-  const decObj = await crypto.decryptJSON(encObj, privateKey).catch(t.abort)
+  const decObj = await crypto.decrypt(encObj, privateKey).catch(t.abort)
   t.expect('object', typeof decObj, 'Pub/Priv key decryption yields an object')
   t.expect(source, decObj.source, 'Pub/Priv key decrypted object matches original object')
 

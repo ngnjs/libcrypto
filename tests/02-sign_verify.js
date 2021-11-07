@@ -24,5 +24,10 @@ test('Content Signing & Verification', async t => {
   const invalid = await crypto.verify(content, signature, keypairs.publicKey).catch(t.abort)
   t.expect(false, invalid, 'verification fails for incorrect private key')
 
+  const obj = { ok: true }
+  const sig = await crypto.sign(obj, privateKey).catch(t.abort)
+  const ok = await crypto.verify(obj, sig, publicKey).catch(t.abort)
+  t.expect(true, ok, 'signing and verification succeeds for objects')
+
   t.end()
 })

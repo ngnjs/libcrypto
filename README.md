@@ -90,18 +90,18 @@ Typically this is used to encrypt communications. The client receives the privat
 
 ## Encrypt/Decrypt JSON
 
-These convenience methods help manage encryption of JSON objects.
+Objects are converted to/from strings automatically. Encryption only works on string values, so conversion is always done automatically whenever an attempt to encrypt an object is detected. Decryption will automatically attempt to parse string content into an object. If parsing fails, the decrypted string is returned. To prevent the decrypt method from auto-parsing a string into an object, pass `false` as the third argument to the `decrypt()` method (as illustrated in the very last line of the following example).
 
 ```javascript
 const obj = { example: true }
-const encObj = await crypto.encryptJSON(obj, encryptionKey)
-const decObj = await crypto.decryptJSON(encObj, encryptionKey)
+const encObj = await crypto.encrypt(obj, encryptionKey)
+const decObj = await crypto.decrypt(encObj, encryptionKey)
 
 // Using public/private keys (RSA-OAEP)
 const obj = { example: true }
 const { publicKey, privateKey } = await crypto.generateRSAKeyPair()
-const encObj = await crypto.encryptJSON(obj, publicKey)
-const decObj = await crypto.decryptJSON(encObj, privateKey)
+const encObj = await crypto.encrypt(obj, publicKey)
+const decObj = await crypto.decrypt(encObj, privateKey[, false])
 ```
 
 These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
@@ -114,8 +114,6 @@ The following methods are importable from this module:
 import {
   encrypt,
   decrypt,
-  encryptJSON,
-  decryptJSON,
   encryptionAlgorithm,
   generateKeys,
   generateRSAKeyPair,

@@ -132,8 +132,9 @@ export async function generateECKeyPair () {
  * Sign content and return the signature.
  * @param {string} key
  * The signing key (typically a private key)
- * @param {string} data
- * The data to sign.
+ * @param {string|object} data
+ * The data to sign. Objects are automatically converted to strings
+ * using `JSON.stringify()`.
  * @param {string} [algorithm]
  * The algorithm used to sign the content. By default, RSA keys
  * use a named format, `RSASSA-PKCS1-v1_5`. ECDSA keys use a named
@@ -144,6 +145,11 @@ export async function generateECKeyPair () {
  * Returns the base64 signature.
  */
 export async function sign (data, pem, algorithm) {
+  // Autoconvert data object to string
+  if (typeof data === 'object') {
+    data = JSON.stringify(data)
+  }
+
   if (runtime === 'node' && !cryptography) {
     const signer = nodecrypto.createSign('SHA256')
     signer.update(data)
@@ -174,7 +180,8 @@ export async function sign (data, pem, algorithm) {
  * @param {string} signature
  * The signature to verify.
  * @param {string} data
- * The data to verify.
+ * The data to verify. Objects are automatically converted to strings
+ * using `JSON.stringify()`.
  * @param {string} [algorithm]
  * The algorithm used to sign the content. By default, RSA keys
  * use a named format, `RSASSA-PKCS1-v1_5`. ECDSA keys use a named
@@ -185,6 +192,11 @@ export async function sign (data, pem, algorithm) {
  * Indicates the signature is valid.
  */
 export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1_5') {
+  // Autoconvert data object to string
+  if (typeof data === 'object') {
+    data = JSON.stringify(data)
+  }
+
   if (runtime === 'node' && !cryptography) {
     const verifier = nodecrypto.createVerify('SHA256')
     verifier.update(data)
@@ -213,8 +225,9 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
  * Encrypts plaintext using AES-GCM with supplied secret/key, for decryption with decrypt().
  * If a PEM private key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
  * @warning Some versions of Deno do not support AES-GCM. AES-CBC is used instead.
- * @param   {String} plaintext
- * Plaintext to be encrypted.
+ * @param   {String|Object} plaintext
+ * Plaintext to be encrypted. Objects are automatically converted to plaintext
+ * using `JSON.stringify`.
  * @param   {String} secret
  * Secret or PEM key to encrypt plaintext.
  * @returns {String}
@@ -225,6 +238,10 @@ export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1
 export async function encrypt (plaintext, secret) {
   if (PEM.isPrivateKey(secret)) {
     throw new Error('Encryption requires a public key (a private key was specified)')
+  }
+
+  if (typeof plaintext === 'object') {
+    plaintext = JSON.stringify(plaintext)
   }
 
   if (runtime === 'node' && !cryptography) {
@@ -271,12 +288,14 @@ export async function encrypt (plaintext, secret) {
  * Base64 ciphertext to be decrypted.
  * @param   {String} secret
  * Secret or PEM key to encrypt plaintext.
+ * @param   {Boolean} [autoparse=true]
+ * Automatically parse JSON strings into objects.
  * @returns {String}
  * Decrypted plaintext.
  * @example
  * `const plaintext = await decrypt(ciphertext, 'pw')`
  */
-export async function decrypt (cipher, secret) {
+export async function decrypt (cipher, secret, autoparse = true) {
   if (PEM.isPublicKey(secret)) {
     throw new Error('Decryption requires a private key (a public key was specified)')
   }
@@ -292,11 +311,11 @@ export async function decrypt (cipher, secret) {
   if (useNode) {
     if (isPrivateKey) {
       const buffer = Buffer.from(cipher, 'base64')
-      return nodecrypto.privateDecrypt({
+      return parse(nodecrypto.privateDecrypt({
         key: secret,
         padding: nodecrypto.constants.RSA_PKCS1_OAEP_PADDING,
         oaepHash: 'sha256'
-      }, buffer).toString('utf8')
+      }, buffer).toString('utf8'), autoparse)
     }
 
     const decipher = nodecrypto.createDecipheriv('aes-256-gcm', simpleKey(secret), iv, { authTagLength: AUTH_TAG_LENGTH })
@@ -304,7 +323,7 @@ export async function decrypt (cipher, secret) {
 
     const decrypted = decipher.update(data, 'base64', 'utf-8') + decipher.final('utf-8')
 
-    return decrypted
+    return parse(decrypted, autoparse)
   }
 
   // If a PEM private key is specified, use it to decrypt the cipher
@@ -312,41 +331,25 @@ export async function decrypt (cipher, secret) {
     const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP' })
     const buffer = await cryptography.subtle.decrypt({ name: 'RSA-OAEP' }, pemKey, base64ToBuf(cipher))
     const data = new Uint8Array(buffer)
-    return decoder.decode(data)
+    return parse(decoder.decode(data), autoparse)
   }
 
   const { key } = await Key(secret, salt)
   const decrypted = await cryptography.subtle.decrypt({ name: ENCRYPTION_ALGORITHM, iv }, key, data).catch(e => console.log(`e: ${e.message}`))
 
-  return decoder.decode(decrypted)
+  return parse(decoder.decode(decrypted), autoparse)
 }
 
-/**
- * Encrypts JSON using AES-GCM with supplied secret/key, for decryption with decrypt().
- * If a PEM private key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
- * @param   {Object} data
- * Data object to be encrypted.
- * @param   {String} secret
- * Secret or PEM key to encrypt plaintext.
- * @returns {String}
- * Encrypted ciphertext.
- */
-export async function encryptJSON (obj, secret) {
-  return await encrypt(JSON.stringify(obj), secret)
-}
+function parse (content, autoparse = true) {
+  if (!autoparse) {
+    return content
+  }
 
-/**
- * Decrypts ciphertext encrypted with encryptJSON() using the supplied secret/key.
- * If a PEM public key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
- * @param   {String} ciphertext
- * Ciphertext to be decrypted.
- * @param   {String} secret
- * Secret or PEM key to encrypt plaintext.
- * @returns {Object}
- * Decrypted object.
- */
-export async function decryptJSON (cipher, secret) {
-  return JSON.parse(await decrypt(...arguments))
+  try {
+    return JSON.parse(content)
+  } catch (e) {
+    return content
+  }
 }
 
 /**
@@ -392,8 +395,6 @@ async function Key (passphrase, salt, hash = 'SHA-256') {
 const crypto = {
   encrypt,
   decrypt,
-  encryptJSON,
-  decryptJSON,
   encryptionAlgorithm,
   generateKeys,
   generateRSAKeyPair,
