@@ -74,7 +74,7 @@ export async function HOTP (secret, cfg = {}) {
  * Returns a string of numbers with the configured number of digits.
  */
 export async function TOTP (secret, cfg = {}) {
-  cfg.seconds = cfg.timestamp || Math.floor(+new Date() / ((cfg.seconds || 30) * 1000))
+  cfg.counter = cfg.timestamp || Math.floor(+new Date() / ((cfg.seconds || 30) * 1000))
   cfg.digits = cfg.digits || 6
 
   return HOTP(secret, cfg)
