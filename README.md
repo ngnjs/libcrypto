@@ -8,6 +8,7 @@ The NGN crypto library provides simple cryptographic building blocks:
 1. Generate RSA or ECDSA Private/Public Keypairs (PEM)
 2. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
 3. Encrypt/Decrypt Content (AES)
+4. One Time Passwords (HOTP/TOTP)
 
 All keys, signatures, and encrypted outputs are Base64 encoded strings (not hex!). Base64 is approximately 25% more efficient than hex (Base16), so the output will be smaller.
 
@@ -106,6 +107,59 @@ const decObj = await crypto.decrypt(encObj, privateKey[, false])
 
 These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
 
+## One Time Passwords (HOTP, TOTP)
+
+This library can generate HMAC-based OTPs and time-based OTPs. TOTPs are compatible with tools like Google Authenticator.
+
+### HMAC-Based One Time Password (HOTP)
+
+**Syntax:**
+
+`HOTP(secret[, options])`
+
+**Options:** _(defaults are shown)_
+
+```javascript
+{
+  counter: 0,
+  algorithm: 'SHA-1', // Other options: SHA-256, SHA-384, SHA-512
+  digits: 6, // Can also be 8
+}
+```
+
+**Example:**
+
+```javascript
+const secret = 'password' // 8 character secret (or 16, 24, 32, etc - must be evenly divisible by 8)
+const hotp = crypto.HOTP(secret)
+console.log(hotp) // 328482
+```
+
+### Time-Based One Time Password (TOTP)
+
+**Syntax:**
+
+`TOTP(secret[, options])`
+
+**Options:** _(defaults are shown)_
+
+```javascript
+{
+  algorithm: 'SHA-1', // Other options: SHA-256, SHA-384, SHA-512
+  digits: 6, // Can also be 8
+  seconds: 30,
+  timestamp: null // Date.getTime() - used to retrieve old values (instead of seconds)
+}
+```
+
+**Example:**
+
+```javascript
+const secret = 'password' // 8 character secret (or 16, 24, 32, etc - must be evenly divisible by 8)
+const totp = crypto.TOTP(secret)
+console.log(hotp) // 6 digit code changes every 30 seconds
+```
+
 ## Exported Functions
 
 The following methods are importable from this module:
@@ -121,6 +175,8 @@ import {
   generateECKeyPair,
   sign,
   verify,
+  HOTP,
+  TOTP,
   PEM
 } from '@ngnjs/libcrypto'
 ```
@@ -135,15 +191,15 @@ Given a shared encryption key or public/private key (PEM), this method determine
 
 This is an object/namespace containing several PEM-specific functions:
 
-1. `isKey(string)` _boolean_
-2. `isPrivateKey(string)` _boolean_
-3. `isPublicKey(string)` _boolean_
-4. `typeOf(string)` _string_ (`RSA` or `EC`)
-5. *`extractKey(string, algorithm)` _CryptoKey_
-6. *`encode(label, code, type)` _string_ (PEM)
-7. *`decode(key)` _ArrayBuffer_
-8. *`encodePrivateKey(key, type)` _string_ Encodes a private PEM
-9. *`encodePublicKey(key, type)` _string_ Encodes a public PEM
-10. *`getDefaultAlgorithm(pem, algorithm, type)` _string_ RSA/RSASSA-PKCS1-v1_5/P-256
+1. `isKey(string)`_boolean_
+2. `isPrivateKey(string)`_boolean_
+3. `isPublicKey(string)`_boolean_
+4. `typeOf(string)`_string_ (`RSA` or `EC`)
+5. *`extractKey(string, algorithm)`_CryptoKey_
+6. *`encode(label, code, type)`_string_ (PEM)
+7. *`decode(key)`_ArrayBuffer_
+8. *`encodePrivateKey(key, type)`_string_ Encodes a private PEM
+9. *`encodePublicKey(key, type)`_string_ Encodes a public PEM
+10. *`getDefaultAlgorithm(pem, algorithm, type)`_string_ RSA/RSASSA-PKCS1-v1_5/P-256
 
 All functions marked with `*` are designed primarily for internal use, but are exposed to provide granular control over PEM creation/consumption.

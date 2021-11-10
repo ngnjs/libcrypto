@@ -1,9 +1,9 @@
 import {
   arrayBufferToString,
   stringToArrayBuffer,
-  BTOA,
   cryptography
 } from './common.js'
+import { BTOA } from './encoding/base64.js'
 
 const PEM_KEY_PATTERN = /-{5}(BEGIN\s.+\s?KEY)-{5}.+-{5}(END\s.+\s?KEY)-{5}/i
 const PEM_PUBLIC_KEY_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PUBLIC\sKEY)-{5}/i

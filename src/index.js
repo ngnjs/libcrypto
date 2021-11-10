@@ -2,11 +2,14 @@ import PEM from './pem.js'
 import {
   nodecrypto,
   cryptography,
-  runtime,
+  runtime
+} from './common.js'
+import {
   bufToBase64,
   base64ToBuf,
   createBase64Cipher
-} from './common.js'
+} from './encoding/base64.js'
+import { HOTP, TOTP } from './otp.js'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -402,10 +405,14 @@ const crypto = {
   generateECKeyPair,
   PEM,
   sign,
-  verify
+  verify,
+  HOTP,
+  TOTP
 }
 
-// Expose crypto as a plugin
-// NGN.crypto = all
-
-export { crypto as default, PEM }
+export {
+  crypto as default,
+  PEM,
+  HOTP,
+  TOTP
+}

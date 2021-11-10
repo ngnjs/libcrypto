@@ -1,6 +1,6 @@
 {
   "name": "@ngnjs/libcrypto",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "A simple cryptography plugin for NGN.",
   "type": "module",
   "author": "Corey Butler",
