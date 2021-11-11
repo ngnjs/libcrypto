@@ -1,6 +1,6 @@
 {
   "name": "@ngnjs/libcrypto",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-alpha.8",
   "description": "A simple cryptography plugin for NGN.",
   "type": "module",
   "author": "Corey Butler",
@@ -22,6 +22,25 @@
     }
   },
   "browser": "./index.js",
+  "sideEffects": false,
+  "keywords": [
+    "crypto",
+    "cryptography",
+    "key",
+    "public",
+    "private",
+    "encrypt",
+    "encryption",
+    "decrypt",
+    "decryption",
+    "sign",
+    "verify",
+    "hotp",
+    "totp",
+    "rsa",
+    "ecdsa",
+    "ec"
+  ],
   "peerDependencies": {
     "ngn": "^2.0.0-alpha.10"
   },
