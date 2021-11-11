@@ -162,7 +162,7 @@ console.log(hotp) // 6 digit code changes every 30 seconds
 
 #### Google Authenticator
 
-Google Authenticator uses Base32-encoded secrets with secrets that 16 characters long.
+Google Authenticator uses Base32-encoded 16 character secrets.
 
 To generate a key for Google Authenticator, use this library's base32 encoding:
 
