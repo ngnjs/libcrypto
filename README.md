@@ -109,7 +109,7 @@ These methods are lightweight wrappers around `encrypt()` and `decrypt()`.
 
 ## One Time Passwords (HOTP, TOTP)
 
-This library can generate HMAC-based OTPs and time-based OTPs. TOTPs are compatible with tools like Google Authenticator.
+This library can generate HMAC-based OTPs and time-based OTPs. TOTPs are compatible with tools like Google Authenticator (see note).
 
 ### HMAC-Based One Time Password (HOTP)
 
@@ -160,6 +160,22 @@ const totp = crypto.TOTP(secret)
 console.log(hotp) // 6 digit code changes every 30 seconds
 ```
 
+#### Google Authenticator
+
+Google Authenticator uses Base32-encoded secrets with secrets that 16 characters long.
+
+To generate a key for Google Authenticator, use this library's base32 encoding:
+
+```javascript
+const key = crypto.base32.encode('passwordpassword') // Output: OBQXG43XN5ZGI4DBONZXO33SMQ======
+```
+
+To produce a UTF-8 string from a base32 string, use this library's base32 decoding:
+
+```javascript
+const text = crypt.base32.decode('OBQXG43XN5ZGI4DBONZXO33SMQ======') // Output: passwordpassword
+```
+
 ## Exported Functions
 
 The following methods are importable from this module:
@@ -177,6 +193,7 @@ import {
   verify,
   HOTP,
   TOTP,
+  base32,
   PEM
 } from '@ngnjs/libcrypto'
 ```

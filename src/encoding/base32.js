@@ -77,10 +77,10 @@ function getLens (b32) {
  */
 export function bufToBase32 (uint8) {
   let tmp
-  const extraBytes = uint8.length % 5
+  const extraBytes = uint8.byteLength % 5
   const parts = []
   const maxChunkLength = 16385 // must be multiple of 5
-  const len = uint8.length - extraBytes
+  const len = uint8.byteLength - extraBytes
 
   // go through the array every 5 bytes, we'll deal with trailing stuff later
   for (let i = 0; i < len; i += maxChunkLength) {

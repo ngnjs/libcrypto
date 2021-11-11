@@ -1,10 +1,14 @@
-import { cryptography, nodecrypto, runtime } from './common.js'
-import { base32ToBuf } from './encoding/base32.js'
+import { cryptography, nodecrypto, runtime, stringToArrayBuffer, arrayBufferToString } from './common.js'
+import { base32ToBuf, bufToBase32 } from './encoding/base32.js'
+
+const base32encode = str => bufToBase32(Uint8Array.from(Array.from(str).map(l => l.charCodeAt(0))))
+const base32decode = input => arrayBufferToString(base32ToBuf(input))
+export const base32 = { encode: base32encode, decode: base32decode }
 
 /**
  * HMAC-based OTP
  * @param {string} secret
- * Secret/key used to create the OTP
+ * UTF-8 secret/key used to create the OTP
  * @param {object} options
  * Configuration options.
  * @param {number} [options.counter=0]
@@ -21,7 +25,8 @@ export async function HOTP (secret, cfg = {}) {
   const algo = algorithm.trim().replace('-', '').toLowerCase()
   const counter = cfg.counter || 0
   const digits = cfg.digits || 6
-  secret = base32ToBuf(secret)
+
+  secret = stringToArrayBuffer(secret)
 
   if (runtime === 'node' && !cryptography) {
     const buffer = Buffer.alloc(8)
@@ -59,6 +64,7 @@ export async function HOTP (secret, cfg = {}) {
 /**
  * Time-based OTP
  * @param {string} secret
+ * UTF-8 secret/key used to create the OTP
  * @param {object} options
  * Configuration options.
  * @param {number} [options.digits=6]

@@ -9,7 +9,7 @@ import {
   base64ToBuf,
   createBase64Cipher
 } from './encoding/base64.js'
-import { HOTP, TOTP } from './otp.js'
+import { HOTP, TOTP, base32 } from './otp.js'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -407,12 +407,14 @@ const crypto = {
   sign,
   verify,
   HOTP,
-  TOTP
+  TOTP,
+  base32
 }
 
 export {
   crypto as default,
   PEM,
   HOTP,
-  TOTP
+  TOTP,
+  base32
 }
