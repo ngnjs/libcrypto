@@ -3,7 +3,7 @@ import {
   stringToArrayBuffer,
   cryptography
 } from './common.js'
-import { BTOA } from './encoding/base64.js'
+import { BTOA, ATOB, bufToBase64 } from './encoding/base64.js'
 
 const PEM_KEY_PATTERN = /-{5}(BEGIN\s.+\s?KEY)-{5}.+-{5}(END\s.+\s?KEY)-{5}/i
 const PEM_PUBLIC_KEY_PATTERN = /-{5}(BEGIN\s((RSA|EC)\s)?PUBLIC\sKEY)-{5}/i
@@ -60,7 +60,7 @@ export const encode = (label, data, type = '') => {
 export const decode = key => {
   const pem = key.replace(/(-{5}([A-Za-z\s]+)KEY-{5})/gi, '').trim()
   // binaryDerString = globalThis.atob(pem)
-  return stringToArrayBuffer(globalThis.atob(pem))
+  return stringToArrayBuffer(ATOB(pem))
 }
 
 export const encodePrivateKey = async (key, type = '') => encode('PRIVATE KEY', await exportKeyAsString('pkcs8', key), type)
@@ -99,6 +99,11 @@ async function importStringAsKey (pem, algorithm) {
     true,
     usage
   )
+}
+
+export const toDER = pem => {
+  console.log(decode(pem))
+  return stringToArrayBuffer(ATOB(bufToBase64(decode(pem))))
 }
 
 export function getDefaultAlgorithm (pem, algorithm, pemtype) {

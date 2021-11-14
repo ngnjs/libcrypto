@@ -1,6 +1,7 @@
 *.log
 *.old
 .*
+_*
 !.github
 !.*ignore
 !.*.yml

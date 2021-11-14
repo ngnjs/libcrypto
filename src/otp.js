@@ -1,5 +1,6 @@
-import { cryptography, nodecrypto, runtime, stringToArrayBuffer, arrayBufferToString } from './common.js'
+import { cryptography, runtime, stringToArrayBuffer, arrayBufferToString } from './common.js'
 import { base32ToBuf, bufToBase32 } from './encoding/base32.js'
+import { pad, truncate, zeropad, createNodeHMAC } from './hmac.js'
 
 const base32encode = str => bufToBase32(Uint8Array.from(Array.from(str).map(l => l.charCodeAt(0))))
 const base32decode = input => arrayBufferToString(base32ToBuf(input))
@@ -26,23 +27,12 @@ export async function HOTP (secret, cfg = {}) {
   const counter = cfg.counter || 0
   const digits = cfg.digits || 6
 
-  secret = stringToArrayBuffer(secret)
-
   if (runtime === 'node' && !cryptography) {
-    const buffer = Buffer.alloc(8)
-    if (Number.isFinite(counter) || typeof counter === 'bigint') {
-      buffer.write(zeropad(counter.toString(16)), 0, 'hex')
-    } else if (Buffer.isBuffer(counter)) {
-      counter.copy(buffer)
-    } else if (typeof counter === 'string') {
-      buffer.write(zeropad(counter), 0, 'hex')
-    } else {
-      throw new Error(`Unexpected counter type ${typeof counter}`)
-    }
-    const hmac = nodecrypto.createHmac(algo, secret).update(buffer).digest()
-
+    const hmac = createNodeHMAC(secret, counter, algo)
     return zeropad(truncate(hmac, digits), digits)
   }
+
+  secret = stringToArrayBuffer(secret)
 
   const key = await cryptography.subtle.importKey(
     'raw',
@@ -84,22 +74,4 @@ export async function TOTP (secret, cfg = {}) {
   cfg.digits = cfg.digits || 6
 
   return HOTP(secret, cfg)
-}
-
-// Uint8Array(8)
-function pad (counter) {
-  const pairs = counter.toString(16).padStart(16, '0').match(/..?/g)
-  const array = pairs.map(v => parseInt(v, 16))
-  return Uint8Array.from(array)
-}
-
-// Number
-function truncate (hs) {
-  const offset = hs[19] & 0b1111
-  return ((hs[offset] & 0x7f) << 24) | (hs[offset + 1] << 16) | (hs[offset + 2] << 8) | hs[offset + 3]
-}
-
-function zeropad (value, digits = 16) {
-  var fill = '0'.repeat(digits)
-  return (fill + value).slice(-digits)
 }

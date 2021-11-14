@@ -10,6 +10,7 @@ import {
   createBase64Cipher
 } from './encoding/base64.js'
 import { HOTP, TOTP, base32 } from './otp.js'
+import JWT from './jwt.js'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -408,7 +409,8 @@ const crypto = {
   verify,
   HOTP,
   TOTP,
-  base32
+  base32,
+  JWT
 }
 
 export {
@@ -416,5 +418,6 @@ export {
   PEM,
   HOTP,
   TOTP,
-  base32
+  base32,
+  JWT
 }
