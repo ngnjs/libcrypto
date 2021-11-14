@@ -176,6 +176,29 @@ To produce a UTF-8 string from a base32 string, use this library's base32 decodi
 const text = crypt.base32.decode('OBQXG43XN5ZGI4DBONZXO33SMQ======') // Output: passwordpassword
 ```
 
+## JSON Web Tokens (JWT)
+
+Easily generate and verify JWTs using HMAC (HS), RSA (RS), and ECDSA (EC) 256-bit, 384-bit, or 512-bit algorithms.
+
+```javascript
+const secret = 'secret'
+const token = await crypto.JWT.createToken({
+  secret,
+  issuer: 'acme corp',
+  account: 'acct name',
+  claims: {
+    name: 'John Doe',
+    admin: true
+  },
+  headers: { kid: 'testdata' },
+  algorithm: 'HS256'
+})
+
+const verified = await crypto.JWT.verifyToken(token, secret)
+```
+
+The issuer, account (sub), claims, and headers are all optional.
+
 ## Exported Functions
 
 The following methods are importable from this module:
@@ -194,7 +217,8 @@ import {
   HOTP,
   TOTP,
   base32,
-  PEM
+  PEM,
+  JWT
 } from '@ngnjs/libcrypto'
 ```
 
@@ -220,3 +244,9 @@ This is an object/namespace containing several PEM-specific functions:
 10. *`getDefaultAlgorithm(pem, algorithm, type)`_string_ RSA/RSASSA-PKCS1-v1_5/P-256
 
 All functions marked with `*` are designed primarily for internal use, but are exposed to provide granular control over PEM creation/consumption.
+
+---
+
+## Additional Docs
+
+The code contains comments with syntax documentation for all methods.
