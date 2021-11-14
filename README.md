@@ -6,9 +6,10 @@ Live examples on [codepen](https://codepen.io/coreybutler/pen/mdMwQQb).
 The NGN crypto library provides simple cryptographic building blocks:
 
 1. Generate RSA or ECDSA Private/Public Keypairs (PEM)
-2. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
-3. Encrypt/Decrypt Content (AES)
-4. One Time Passwords (HOTP/TOTP)
+1. Sign & Verify Content (using PEM keys) - Not yet supported by Deno
+1. Encrypt/Decrypt Content (AES)
+1. One Time Passwords (HOTP/TOTP)
+1. Generate/Verify JSON Web Tokens (JWT)
 
 All keys, signatures, and encrypted outputs are Base64 encoded strings (not hex!). Base64 is approximately 25% more efficient than hex (Base16), so the output will be smaller.
 
@@ -198,6 +199,8 @@ const verified = await crypto.JWT.verifyToken(token, secret)
 ```
 
 The issuer, account (sub), claims, and headers are all optional.
+
+See [here](https://jwt.io/introduction) for general JWT details.
 
 ## Exported Functions
 
