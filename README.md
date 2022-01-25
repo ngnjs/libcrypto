@@ -158,7 +158,7 @@ console.log(hotp) // 328482
 ```javascript
 const secret = 'password' // 8 character secret (or 16, 24, 32, etc - must be evenly divisible by 8)
 const totp = crypto.TOTP(secret)
-console.log(hotp) // 6 digit code changes every 30 seconds
+console.log(totp) // 6 digit code changes every 30 seconds
 ```
 
 #### Google Authenticator
