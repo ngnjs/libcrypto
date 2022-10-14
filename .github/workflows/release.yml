@@ -85,6 +85,7 @@ jobs:
       - name: Build & Test
         if: success()
         run: |
+          npm i
           npm test
 
       - name: Tag
