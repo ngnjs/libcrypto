@@ -70,7 +70,7 @@
   ],
   "devDependencies": {
     "tappedout": "^1.1.8",
-    "@quikdev/js": "^1.0.1-beta.2"
+    "@quikdev/js": "^1.0.0-beta.2"
   },
   "scripts": {
     "test": "npm run build && quikdev-js test --platform browser --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
