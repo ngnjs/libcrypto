@@ -10,12 +10,19 @@ jobs:
     name: 'Release'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+
       - name: Get npm cache directory
         id: npm-cache-dir
         run: |
           echo "::set-output name=dir::$(npm config get cache)"
 
-      - name: Checkout Code
+      - name: Setup Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '16'
+
+      - name: Setup npm Cache
         uses: actions/cache@v3
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
@@ -24,12 +31,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v1
-        with:
-          node-version: '16'
+      - name: Install Dependencies
+        if: steps.npm-cache.outputs.cache-hit != 'true'
+        run: |
+          npm install
 
-      - name: Establish Docker Cache
+      - name: Setup Docker Cache
         uses: actions/cache@v3
         id: docker-cache
         with:
@@ -38,7 +45,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-docker-
 
-      - name: Load cached Docker layers
+      - name: Load Cached Docker Layers
         run: |
           if [ -d "docker-cache" ]; then
             cat docker-cache/x* > my-image.tar
@@ -85,7 +92,6 @@ jobs:
       - name: Build & Test
         if: success()
         run: |
-          npm i
           npm test
 
       - name: Tag
