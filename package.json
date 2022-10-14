@@ -68,9 +68,12 @@
     "ecdsa",
     "ec"
   ],
+  "dependencies": {
+    "rfc4648": "^1.5.2"
+  },
   "devDependencies": {
     "tappedout": "^1.1.8",
-    "@quikdev/js": "^1.0.0-beta.4"
+    "@quikdev/js": "^1.0.0-beta.5"
   },
   "scripts": {
     "test": "npm run build && quikdev-js test --platform deno --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
@@ -114,8 +117,5 @@
     "embed": [
       "tappedout"
     ]
-  },
-  "dependencies": {
-    "rfc4648": "^1.5.2"
   }
 }
