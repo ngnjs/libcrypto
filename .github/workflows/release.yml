@@ -98,7 +98,7 @@ jobs:
         id: autotagger
         if: success()
         uses: butlerlogic/action-autotag@master
-        with:
+        env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
         # If the new version/tag is a pre-release (i.e. 1.0.0-beta.1), create
