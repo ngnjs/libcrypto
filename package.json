@@ -73,11 +73,11 @@
   },
   "devDependencies": {
     "tappedout": "^1.1.8",
-    "@quikdev/js": "^1.0.0-beta.5"
+    "@quikdev/js": "^1.0.0-beta.6"
   },
   "scripts": {
     "test": "npm run build && quikdev-js test --platform deno --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
-    "build": "quikdev-js build --pack --external crypto --external os --outdir ./.dist/@ngnjs/libcrypto",
+    "build": "npm run clean && quikdev-js build --pack --external crypto --external os --outdir ./.dist/@ngnjs/libcrypto",
     "xjsdoc": "jsdoc -r -P ./package.json ./src",
     "test:browser": "npm run build && quikdev-js test --platform browser --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
     "test:node": "npm run build && quikdev-js test --platform node --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
@@ -104,7 +104,9 @@
     "old:report:preview": "npm pack --dry-run && echo \"==============================\" && echo \"This report shows what will be published to the module registry. Pay attention to the tarball contents and assure no sensitive files will be published.\"",
     "old:update": "npm update --save --save-dev --save-optional",
     "old:ci": "dev test --mode ci --peer -rt browser tests/*.js",
-    "old:ws": "dev ws"
+    "old:ws": "dev ws",
+    "clean": "quikdev-js clean ./.dist/@ngnjs/libcrypto",
+    "bundle:module": "quikdev-js release --source ./.dist/@ngnjs/libcrypto --target ./.dist"
   },
   "quikdev-js": {
     "replace": {
