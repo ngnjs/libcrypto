@@ -1,6 +1,6 @@
 {
   "name": "@ngnjs/libcrypto",
-  "version": "1.0.0",
+  "version": "1.1.0-preview.1",
   "description": "A simple cryptography plugin for NGN.",
   "type": "module",
   "author": "Corey Butler",
@@ -19,6 +19,33 @@
   "exports": {
     ".": {
       "import": "./index.js"
+    },
+    "./RSA": {
+      "import": "./keys/rsa.js"
+    },
+    "./ECDSA": {
+      "import": "./keys/ecdsa.js"
+    },
+    "./HMAC": {
+      "import": "./keys/hmac.js"
+    },
+    "./PEM": {
+      "import": "./encoding/pem.js"
+    },
+    "./Base32": {
+      "import": "./encoding/base32.js"
+    },
+    "./Base64": {
+      "import": "./encoding/base64.js"
+    },
+    "./OTP": {
+      "import": "./otp/otp.js"
+    },
+    "./HOTP": {
+      "import": "./otp/otp.js"
+    },
+    "./TOTP": {
+      "import": "./otp/otp.js"
     }
   },
   "browser": "./index.js",
@@ -41,67 +68,53 @@
     "ecdsa",
     "ec"
   ],
-  "peerDependencies": {
-    "ngn": "^2.0.0-alpha.10"
-  },
   "devDependencies": {
-    "@author.io/dev": "^1.1.5",
-    "@ngnjs/libcrypto-debug": "^1.0.0-alpha"
+    "tappedout": "^1.1.8"
   },
   "scripts": {
-    "test": "npm run test:node && npm run test:deno && npm run test:browser && npm run report:syntax && npm run report:size",
-    "start": "dev workspace",
-    "build": "dev build",
-    "test:node": "dev test -rt node tests/*.js",
-    "test:deno": "dev test -rt deno tests/*.js",
-    "test:browser": "dev test -rt browser tests/*.js",
-    "manually": "dev test -rt manual tests/*.js",
-    "report:syntax": "dev report syntax --pretty",
-    "report:size": "dev report size ./.dist/**/*.js ./.dist/**/*.js.map",
-    "report:compat": "dev report compatibility ./src/**/*.js",
-    "report:preview": "npm pack --dry-run && echo \"==============================\" && echo \"This report shows what will be published to the module registry. Pay attention to the tarball contents and assure no sensitive files will be published.\"",
-    "update": "npm update --save --save-dev --save-optional",
-    "ci": "dev test --mode ci --peer -rt browser tests/*.js",
-    "ws": "dev ws"
+    "test": "npm run build && quikdev-js test --platform browser --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
+    "build": "quikdev-js build --pack --external crypto --external os --outdir ./.dist/@ngnjs/libcrypto",
+    "xjsdoc": "jsdoc -r -P ./package.json ./src",
+    "test:browser": "npm run build && quikdev-js test --platform browser --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
+    "test:node": "npm run build && quikdev-js test --platform node --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
+    "test:deno:old": "npm run build && quikdev-js test --platform deno --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
+    "test:jwt:deno": "npm run build && quikdev-js test --platform deno@1.25.3 --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests/05-jwt.js",
+    "test:jwt:node": "npm run build && quikdev-js test --platform node --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests/05-jwt.js",
+    "test:jwt:node:old": "npm run build && quikdev-js test --platform node@15.0.0 --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests/05-jwt.js",
+    "test:deno:sanity": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*-sanity.js --verbose --output pretty --sourcemap",
+    "test:deno:signing": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*-signing.js --verbose --output pretty --sourcemap",
+    "test:deno:encryption": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*-encryption.js --verbose --output pretty --sourcemap",
+    "test:deno:otp": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*-otp.js --verbose --output pretty --sourcemap",
+    "test:deno:jwt": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*-jwt.js --verbose --output pretty --sourcemap",
+    "test:deno": "npm run build && quikdev-js test --platform deno --external crypto --external os --entry ./tests/*.js --verbose --output pretty --sourcemap",
+    "old:xtest": "npm run test:node && npm run test:deno && npm run test:browser && npm run report:syntax && npm run report:size",
+    "old:start": "dev workspace",
+    "old:xbuild": "dev build",
+    "old:test:node": "dev test -rt node tests/*.js",
+    "old:test:deno": "dev test -rt deno tests/*.js",
+    "old:test:browser": "dev test -rt browser tests/*.js",
+    "old:manually": "dev test -rt manual tests/*.js",
+    "old:report:syntax": "dev report syntax --pretty",
+    "old:report:size": "dev report size ./.dist/**/*.js ./.dist/**/*.js.map",
+    "old:report:compat": "dev report compatibility ./src/**/*.js",
+    "old:report:preview": "npm pack --dry-run && echo \"==============================\" && echo \"This report shows what will be published to the module registry. Pay attention to the tarball contents and assure no sensitive files will be published.\"",
+    "old:update": "npm update --save --save-dev --save-optional",
+    "old:ci": "dev test --mode ci --peer -rt browser tests/*.js",
+    "old:ws": "dev ws"
   },
-  "dev": {
-    "mode": "source",
+  "quikdev-js": {
     "replace": {
       "<#REPLACE_VERSION#>": "package.version"
     },
-    "autoimport": [
-      "import NGN from 'ngn'"
-    ],
-    "ci": {
-      "verbose": true,
-      "peer": true,
-      "buildoption": {
-        "preserveEntrySignatures": true
-      },
-      "alias": {
-        "ngn": "/node_modules/ngn/index.js",
-        "@ngnjs/libcrypto": "/app/.dist/libcrypto/index.js"
-      }
+    "alias": {
+      "@ngnjs/libcrypto": "./.dist/@ngnjs/libcrypto/index.js",
+      "rfc4648": "./node_modules/rfc4648/lib/index.mjs"
     },
-    "source": {
-      "volume": [
-        "../core/.dist/ngn:/node_modules/ngn",
-        "../core/src:/source/ngn"
-      ],
-      "buildoption": {
-        "preserveEntrySignatures": true
-      },
-      "alias": {
-        "ngn": "/node_modules/ngn/index.js",
-        "@ngnjs/libcrypto": "/app/src/index.js"
-      }
-    }
-  },
-  "standard": {
-    "globals": [
-      "globalThis",
-      "window",
-      "global"
+    "embed": [
+      "tappedout"
     ]
+  },
+  "dependencies": {
+    "rfc4648": "^1.5.2"
   }
 }

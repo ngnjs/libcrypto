@@ -177,28 +177,79 @@ To produce a UTF-8 string from a base32 string, use this library's base32 decodi
 const text = crypt.base32.decode('OBQXG43XN5ZGI4DBONZXO33SMQ======') // Output: passwordpassword
 ```
 
-## JSON Web Tokens (JWT)
+## Signed JSON Web Tokens (JWT)
 
-Easily generate and verify JWTs using HMAC (HS), RSA (RS), and ECDSA (EC) 256-bit, 384-bit, or 512-bit algorithms.
+Easily generate and verify signed JWTs using HMAC (HS), RSA-PKCS1-v1_5 (RS), RSA-PSS (PS), and ECDSA (EC) 256-bit, 384-bit, or 512-bit algorithms.
+
+The default algorithm is `EC256`. This produces smaller output, but is slightly slower than `RS256` (which is slightly larger).
 
 ```javascript
 const secret = 'secret'
-const token = await crypto.JWT.createToken({
+const token = await crypto.JWT.create({
   secret,
+  algorithm: 'HS256',
   issuer: 'acme corp',
   account: 'acct name',
   claims: {
     name: 'John Doe',
     admin: true
   },
-  headers: { kid: 'testdata' },
-  algorithm: 'HS256'
+  headers: { kid: 'testdata' }
 })
 
-const verified = await crypto.JWT.verifyToken(token, secret)
+const verified = await crypto.JWT.verify(token, secret)
 ```
 
-The issuer, account (sub), claims, and headers are all optional.
+The issuer (iss), account (sub), claims, and headers are all optional.
+
+The example above uses a shared key for signing and verifying JWTs. A more secure option is to use public/private keypairs.
+
+There are two ways to use public/private keypairs.
+
+### Custom PKI Keypair
+
+A custom signing key (in PEM format) can be provided as the secret.
+
+```javascript
+const { publicKey, privateKey } = crypto.generateRSAKeyPair(2048, 'SHA-256')
+const secret = crypto.PEM.encodePrivateKey(privateKey)
+const token = await crypto.JWT.create({
+  secret,
+  algorithm: 'HS256',
+  issuer: 'acme corp',
+  account: 'acct name',
+  claims: {
+    name: 'John Doe',
+    admin: true
+  },
+  headers: { kid: 'testdata' }
+})
+
+const verified = await crypto.JWT.verify(token, crypto.PEM.encodePublicKey(publicKey))
+```
+
+#### Autogenerate PKI Keypair
+
+Alternatively, the keypair can be automatically generated.
+
+```javascript
+// Notice there is no "secret" attribute and the
+// result of the create method is an array containing
+// the token, public key (verificationKey), and private
+// key (signingKey).
+const [token, verificationKeyPEM, signingKeyPEM] = await crypto.JWT.create({
+  algorithm: 'HS256',
+  issuer: 'acme corp',
+  account: 'acct name',
+  claims: {
+    name: 'John Doe',
+    admin: true
+  },
+  headers: { kid: 'testdata' }
+})
+
+const verified = await crypto.JWT.verify(token, publicKey)
+```
 
 See [here](https://jwt.io/introduction) for general JWT details.
 

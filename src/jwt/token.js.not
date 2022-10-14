@@ -1,0 +1,71 @@
+import { ATOB, BTOA } from '../encoding'
+const encoder = new TextEncoder()
+const decoder = new TextDecoder()
+
+export class Base64 {
+  static encode(buffer) {
+    if (typeof buffer === 'string') {
+      return Base64.encode(encoder.encode(buffer))
+    }
+    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  }
+  static decode(string) {
+    return Uint8Array.from(atob(string.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '')), c => c.charCodeAt(0))
+  }
+  static stringify(buffer) {
+    if (typeof buffer === 'string') {
+      return Base64.stringify(Base64.decode(buffer))
+    }
+    return decoder.decode(buffer)
+  }
+}
+
+export class JWT {
+  static async sign(payload, options = { secret: '' }) {
+    const alg = options.algorithm || (options.secret ? 'HS256' : 'none')
+
+    const [meta, claims] = [{ typ: 'JWT', alg }, payload].map(JSON.stringify).map(Base64.encode)
+
+    const algorithm = getAlgorithm(alg)
+
+    if (!algorithm) return [meta, claims].join('.') + '.'
+
+    const key = await JWT.key(options.secret, algorithm, 'sign')
+
+    const signature = await crypto.subtle.sign(algorithm, key, Base64.decode(claims))
+
+    return [meta, claims, Base64.encode(signature)].join('.')
+  }
+
+  static async verify(token, options = { secret: '' }) {
+    const [header, message, signature] = token.split('.').map(Base64.decode)
+
+    const [meta, claims] = [header, message].map(Base64.stringify).map(JSON.parse)
+
+    const algorithm = getAlgorithm(meta.alg)
+
+    const key = await JWT.key(options.secret, algorithm, 'verify')
+
+    const verified = await crypto.subtle.verify(algorithm, key, signature, message)
+
+    if (verified) {
+      return claims
+    }
+
+    return null
+  }
+
+  static async key(secret, algorithm, mode = 'sign') {
+    if (typeof secret !== 'string') {
+      return secret
+    }
+    return crypto.subtle.importKey('raw', encoder.encode(options.secret), algorithm, false, [mode])
+  }
+
+  static async keypair({ algorithm = 'RS256', extractable = false } = {}) {
+    return crypto.subtle.generateKey(getAlgorithm(algorithm), extractable, ["sign", "verify"])
+  }
+}
+
+
+export default JWT

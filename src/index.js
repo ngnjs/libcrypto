@@ -1,423 +1,394 @@
-import PEM from './pem.js'
+import * as PEM from './encoding/pem.js'
+import * as Base64 from './encoding/base64.js'
+import * as Base32 from './encoding/base32.js'
+import * as RSA from './keys/rsa.js'
+import * as ECDSA from './keys/ecdsa.js'
+import * as OTP from './otp/otp.js'
+// import * as JWT from './jwt/token.js'
+// import * as ECDH from './keys/ecdh.js'
+import * as HMAC from './keys/hmac.js'
 import {
-  nodecrypto,
-  cryptography,
-  runtime
-} from './common.js'
-import {
-  bufToBase64,
-  base64ToBuf,
-  createBase64Cipher
-} from './encoding/base64.js'
-import { HOTP, TOTP, base32 } from './otp.js'
-import JWT from './jwt.js'
+  normalize,
+  ABBREVIATIONS,
+  AES_ALGORITHMS,
+  DERIVE_ALGORITHMS,
+  ENCRYPTION_ALGORITHMS,
+  RSA_OAEP_ALGORITHMS,
+  SALT_LENGTH,
+  SIGNING_ALGORITHMS,
+  // ECDH_ALGORITHMS
+} from './lib/algorithms.js'
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
-const SALT_LENGTH = 16
-const IV_LENGTH = runtime === 'deno' ? 16 : 12
-const AUTH_TAG_LENGTH = 16
-const ENCRYPTION_ALGORITHM = runtime === 'deno' ? 'AES-CBC' : 'AES-GCM'
 
 /**
- * Generate a TLS public/private key pair using RSA.
- * Both keys are PEM formatted as `spki` (public) and
- * `pkcs8` (private) keys. This is the most common
- * form of keypair generation, but produces larger keys
- * than ECDSA keys.
- * @param {number} [bit=2048] (1024, 2048, 4096)
- * The bit length of the key. Standard is `2048`. For high
- * security, use `4096` (slower).
+ * Create a common keypair using the `ECDSA P-256 (ES256)` strategy.
+ * This is the most commonly used keypair type.
+ * @async
+ * @param {string} [algorithm=S256]
+ * The named algorithm to use when generating the keypairs
+ * - `RS256` RSASSA-PKCS1-v1_5 SHA-256 2048 bit keys
+ * - `RS384` RSASSA-PKCS1-v1_5 SHA-384 3072 bit keys
+ * - `RS512` RSASSA-PKCS1-v1_5 SHA-512 4096 bit keys
+ * - `PS256` RSA-PSS SHA-256 2048 bit keys
+ * - `PS384` RSA-PSS SHA-384 3072 bit keys
+ * - `PS512` RSA-PSS SHA-512 4096 bit keys
+ * - `ES256` ECDSA P-256 keys
+ * - `ES384` ECDSA P-384 keys
+ * - `ES512` ECDSA P-512 keys (not supported in Deno)
+ * @param {string[]} [usage=['sign', 'verify']]
+ * The privileges assigned to the keypair.
+ * @returns {Object}
+ * Returns an object with two crypto keys, called `publicKey`
+ * and `privateKey`
+ */
+export async function createKeypair (algorithm = 'ES256', usage = ['sign', 'verify']) {
+  algorithm = normalize(algorithm, SIGNING_ALGORITHMS)
+
+  if (algorithm.name === 'ECDSA') {
+    return ECDSA.createKeypair(algorithm, usage)
+  }
+
+  return RSA.createKeypair(algorithm, usage)
+}
+
+/**
+ * Create a keypair using the `RSASSA-PKCS1-v1_5` strategy.
+ * The results will be PEM-encoded strings.
+ * @async
  * @param {string} [hash=SHA-256] (SHA-256, SHA-384, SHA-512)
- * The hashing algorithm used to generate keys.
+ * The algorithm used to hash the keypair.
+ * @param {number} [size=2048] (2048, 3072, 4096)
+ * The modulus length/size of the keypair.
+ * @param {string[]} [usage=['sign', 'verify']]
+ * The privileges assigned to the keypair.
  * @returns {Object}
- * The object returned contains two keys, both of which are in PEM format:
- * ```
- * {
- *   public: '-----BEGIN RSA PUBLIC KEY-----...'
- *   private: '-----BEGIN RSA PRIVATE KEY-----...'
- * }
- * ```
+ * Returns an object with two PEM-encoded values, called `publicKey`
+ * and `privateKey`
  */
-export async function generateRSAKeyPair (bit = 2048, hash = 'SHA-256') {
-  // In Node.js < 17, use Node crypto
-  if (runtime === 'node' && !cryptography) {
-    return new Promise((resolve, reject) => {
-      nodecrypto.generateKeyPair('rsa', {
-        modulusLength: bit,
-        publicExponent: 0x10101,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-      }, (err, publicKey, privateKey) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve({ publicKey, privateKey })
-        }
-      })
-    })
+export async function createKeypairPEM () {
+  return await PEM.ToPEM(await createKeypair(...arguments))
+}
+
+/**
+ * @param {string} [algorithm=OAEP256]
+ * The named algorithm used to produce asymmetric encryption/decryption keys.
+ * - `OAEP256` RSA-OAEP SHA-256 2048-bit
+ * - `OAEP384` RSA-OAEP SHA-384 3072-bit
+ * - `OAEP512` RSA-OAEP SHA-512 4096-bit
+ * @returns {Object}
+ * Returns an object with two PEM-encoded keys: `encryptionKey` and `decryptionKey`.
+ * The encryption key is a public key while the decryption key is a private key.
+ */
+export async function createEncryptionKeypair (algorithm = 'OAEP256') {
+  algorithm = normalize(algorithm, Object.assign({}, RSA_OAEP_ALGORITHMS/*, ECDH_ALGORITHMS*/))
+
+  let keypair
+  if (algorithm.name === 'RSA-OAEP') {
+    keypair = await createKeypairPEM(algorithm, ['encrypt', 'decrypt'])
+  // } else {
+  //   keypair = await createKeypairPEM(algorithm, ['deriveKey', 'deriveBits'])
+  //   return {
+  //     encryptionKey: keypair.privateKey,
+  //     decryptionKey: keypair.publicKey
+  //   }
   }
 
-  // All other runtimes
-  return await generateKeyPair({
-    name: 'RSASSA-PKCS1-v1_5',
-    modulusLength: bit,
-    publicExponent: new Uint8Array([1, 0, 1]),
-    hash
-  }, 'RSA')
+  return {
+    encryptionKey: keypair.publicKey,
+    decryptionKey: keypair.privateKey
+  }
 }
 
 /**
- * Generate public and private keys.
- * By default, this generates 2048-bit RSA keys using SHA-256.
- * @alias generateRSAKeyPair
- * @returns {Object}
- * The object returned contains two keys, both of which are in PEM format:
- * ```
- * {
- *   public: '-----BEGIN RSA PUBLIC KEY-----...'
- *   private: '-----BEGIN RSA PRIVATE KEY-----...'
- * }
- * ```
+ * Create a signing/verification keypair.
+ * @param {string} [algorithm=ES256]
+ * The named algorithm used to produce the keypair.
+ * - `RS256` RSASSA-PKCS1-v1_5 SHA-256 2048 bit keys
+ * - `RS384` RSASSA-PKCS1-v1_5 SHA-384 3072 bit keys
+ * - `RS512` RSASSA-PKCS1-v1_5 SHA-512 4096 bit keys
+ * - `PS256` RSA-PSS SHA-256 2048 bit keys
+ * - `PS384` RSA-PSS SHA-384 3072 bit keys
+ * - `PS512` RSA-PSS SHA-512 4096 bit keys
+ * - `ES256` ECDSA P-256 keys
+ * - `ES384` ECDSA P-384 keys
+ * - `ES512` ECDSA P-512 keys (not supported in Deno)
+ * @param {string} [secret]
+ * A (required) password for HMAC (HS256, HS384, HS512) keys.
+ * Optional for all other algorithms.
+ * @returns {object}
+ * Returns an object with two PEM-encoded values, called `signingKey`
+ * (private key) and `verificationKey` (public key).
+ * The HMAC algorithm uses a shared secret. As such, both
+ * keys are the same.
  */
-export async function generateKeys () {
-  return await generateRSAKeyPair(...arguments)
-}
+export async function createSigningKeypair (algorithm = 'ES256', secret) {
+  algorithm = normalize(algorithm, SIGNING_ALGORITHMS)
 
-/**
- * Generate a TLS public/private key pair using ECDSA.
- * This uses the `P-256` named curve by default. Both keys are PEM
- * formatted as `spki` (public) and `pkcs8` (private) keys.
- * ECDSA provides the same encryption strength as RSA, but
- * with smaller keys.
- * @param {string} [namedCurve=P-256] (P-256, P-384, P-521)
- * The named curve to use.
- * @returns {Object}
- * The object returned contains two keys, both of which are in PEM format:
- * ```
- * {
- *   public: '-----BEGIN EC PUBLIC KEY-----...'
- *   private: '-----BEGIN EC PRIVATE KEY-----...'
- * }
- * ```
- */
-export async function generateECDSAKeyPair (namedCurve = 'P-256') {
-  // In Node.js < 17, use Node crypto
-  if (runtime === 'node' && !cryptography) {
-    return new Promise((resolve, reject) => {
-      nodecrypto.generateKeyPair('ec', {
-        namedCurve,
-        publicKeyEncoding: { type: 'spki', format: 'pem' },
-        privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-      }, (err, publicKey, privateKey) => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve({ publicKey, privateKey })
-        }
-      })
-    })
+  if (algorithm.name === 'HMAC') {
+    if (!secret) {
+      throw new Error('HMAC keys require a secret')
+    }
+
+    const key = await HMAC.createKeyPEM(secret, algorithm)
+    return {
+      verificationKey: key,
+      signingKey: key
+    }
   }
 
-  return await generateKeyPair({
-    name: 'ECDSA',
-    namedCurve
-  }, 'EC')
-}
-
-/**
- * @alias generateECDSAKeyPair
- */
-export async function generateECKeyPair () {
-  return await generateECDSAKeyPair(...arguments)
+  const { privateKey, publicKey } = await createKeypairPEM(algorithm, ['sign', 'verify'])
+  return {
+    verificationKey: publicKey,
+    signingKey: privateKey
+  }
 }
 
 /**
  * Sign content and return the signature.
- * @param {string} key
- * The signing key (typically a private key)
+ * @param {CryptoKey|string} key
+ * The signing key (typically a private key). This can
+ * be a CryptoKey or PEM-encoded string.
  * @param {string|object} data
  * The data to sign. Objects are automatically converted to strings
  * using `JSON.stringify()`.
  * @param {string} [algorithm]
- * The algorithm used to sign the content. By default, RSA keys
- * use a named format, `RSASSA-PKCS1-v1_5`. ECDSA keys use a named
- * curve, `P-256`, by default.
- *
- * In **Node.js _< v17.0.0_**, `SHA256` is always used for the algorithm.
+ * The algorithm used to sign the content. If no algorithm is
+ * defined, an attempt will be made to identify the algorithm
+ * from the signing key. Falls back to `ES256` if no other
+ * algorithm is detected.
+ * - `HS256` HMAC SHA-256 keys
+ * - `HS384` HMAC SHA-384 keys
+ * - `HS512` HMAC SHA-512 keys
+ * - `RS256` RSASSA-PKCS1-v1_5 SHA-256 2048 bit keys
+ * - `RS384` RSASSA-PKCS1-v1_5 SHA-384 3072 bit keys
+ * - `RS512` RSASSA-PKCS1-v1_5 SHA-512 4096 bit keys
+ * - `PS256` RSA-PSS SHA-256 2048 bit keys
+ * - `PS384` RSA-PSS SHA-384 3072 bit keys
+ * - `PS512` RSA-PSS SHA-512 4096 bit keys
+ * - `ES256` ECDSA P-256 keys
+ * - `ES384` ECDSA P-384 keys
+ * - `ES512` ECDSA P-512 keys (not supported in Deno)
  * @returns {string}
- * Returns the base64 signature.
+ * Returns the Base64 signature.
  */
-export async function sign (data, pem, algorithm) {
-  // Autoconvert data object to string
-  if (typeof data === 'object') {
-    data = JSON.stringify(data)
+export async function sign (data, key, algorithm) {
+  if (!algorithm) {
+    const keyparts = PEM.info(key)
+    algorithm = `${ABBREVIATIONS[keyparts.algorithm]}256`
   }
 
-  if (runtime === 'node' && !cryptography) {
-    const signer = nodecrypto.createSign('SHA256')
-    signer.update(data)
-    signer.end()
+  algorithm = normalize(algorithm)
+  key = await PEM.normalizeKey(key, algorithm, ['sign'])
+  data = normalizeData(data)
 
-    return signer.sign(pem).toString('base64')
+  delete algorithm.publicExponent
+  delete algorithm.modulusLength
+  if (algorithm.name === 'RSA-PSS') {
+    algorithm.saltLength = 32
   }
 
-  algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
-  if (algorithm.name === 'ECDSA') {
-    algorithm.hash = 'SHA-256'
-  }
-
-  const key = await PEM.extractKey(pem, algorithm)
-  const buffer = await cryptography.subtle.sign(
+  const buffer = await crypto.subtle.sign(
     algorithm,
     key,
     encoder.encode(data)
   )
 
-  return bufToBase64(buffer)
+  return Base64.ArrayBufferToBase64(buffer)
 }
 
 /**
- * Verify signed content.
- * @param {string} key
- * The verification key (typically a public key)
+ * Verify content with the provided signature.
+ * @param {string|object} data
+ * The data to verify.
  * @param {string} signature
- * The signature to verify.
- * @param {string} data
- * The data to verify. Objects are automatically converted to strings
- * using `JSON.stringify()`.
- * @param {string} [algorithm]
- * The algorithm used to sign the content. By default, RSA keys
- * use a named format, `RSASSA-PKCS1-v1_5`. ECDSA keys use a named
- * curve, `P-256`, by default.
- *
- * In **Node.js _< v17.0.0_**, `SHA256` is always used for the algorithm.
- * @returns {boolean}
- * Indicates the signature is valid.
+ * The signature to verify the data with.
+ * @param {string|CryptoKey} key
+ * A PEM-encoded public (or shared secret) string or CryptoKey object.
+ * @param {string} [algorithm=ES256]
+ * The key algorithm. If this is not supplied, an _attempt_
+ * will be made to autodetect the algorithm. Defaults to
+ * `ES256` when an algorithm cannot be detected.
+ * @returns
  */
-export async function verify (data, signature, pem, algorithm = 'RSASSA-PKCS1-v1_5') {
-  // Autoconvert data object to string
-  if (typeof data === 'object') {
-    data = JSON.stringify(data)
+export async function verify (data, signature, key, algorithm = 'ES256') {
+  algorithm = normalize(algorithm)
+  data = normalizeData(data)
+  key = await PEM.normalizeKey(key, algorithm, ['verify'])
+
+  if (key.type !== 'public' && key.type !== 'secret') {
+    throw new Error(`invalid key - must use a public or secret key, not ${key.type}`)
   }
 
-  if (runtime === 'node' && !cryptography) {
-    const verifier = nodecrypto.createVerify('SHA256')
-    verifier.update(data)
-    verifier.end()
-
-    return verifier.verify(pem, signature, 'base64')
-  }
-
-  algorithm = { name: PEM.getDefaultAlgorithm(pem, algorithm) }
-  if (algorithm.name === 'ECDSA') {
-    algorithm.hash = 'SHA-256'
-  }
-
-  const key = await PEM.extractKey(pem, algorithm)
-  const verified = await cryptography.subtle.verify(
+  return await crypto.subtle.verify(
     algorithm,
     key,
-    base64ToBuf(signature),
+    Base64.Base64ToArrayBuffer(signature),
     encoder.encode(data)
   )
-
-  return verified
 }
 
 /**
- * Encrypts plaintext using AES-GCM with supplied secret/key, for decryption with decrypt().
- * If a PEM private key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
- * @warning Some versions of Deno do not support AES-GCM. AES-CBC is used instead.
- * @param   {String|Object} plaintext
- * Plaintext to be encrypted. Objects are automatically converted to plaintext
- * using `JSON.stringify`.
- * @param   {String} secret
- * Secret or PEM key to encrypt plaintext.
- * @returns {String}
- * Base64 encrypted cipher text.
- * @example
- * `const ciphertext = await encrypt('my secret text', 'pw')`
+ * Encrypt text or objects.
+ * @param {string|object} plaintext
+ * The text or object to encrypt. Since objects cannot be encrypted, they
+ * are automatically serialized to a string before encrypting.
+ * @param {string|CryptoKey} [passphrase]
+ * For shared-key encryption (i.e. "password-based"), a text-based password can be
+ * used to encrypt the plaintext. Alternatively, a valid RSA-OAEP CryptoKey can
+ * be supplied to encrypt the plaintext. This function also accepts PEM-encoded
+ * RSA-OAEP public keys (text), which are automatically converted into a CryptoKey.
+ * @param {string} [encryptionAlgorithm]
+ * The named algorithm will be used to encrypt data. By default, this will be
+ * `RS256` (RSA-OAEP SHA-256) for PEM-encoded keys or `GCM256` (AES-GCM 256-bit)
+ * for shared key (password-based) encryption. Valid options include:
+ * **_Asymmetric Key Encryption (Recommended)_**:
+ * - `RS256` RSA-OAEP SHA-256 2048-bit (default for asymmetric encryption)
+ * - `RS384` RSA-OAEP SHA-384 3072-bit
+ * - `RS512` RSA-OAEP SHA-512 4096-bit
+ *
+ * **_Shared Key Encryption_**:
+ * - `GCM128` AES-GCM 128-bit (12 character IV)
+ * - `GCM192` AES-GCM 192-bit (12 character IV)
+ * - `GCM256` AES-GCM 256-bit (12 character IV) (default for shared-key encryption)
+ * - `CBC128` AES-CBC 128-bit (16 character IV)
+ * - `CBC192` AES-CBC 192-bit (16 character IV)
+ * - `CBC256` AES-CBC 256-bit (16 character IV)
+ * - `CTR128` AES-CTR 128-bit (16 character counter)
+ * @param {string} [derivationAlgorithm=PB256]
+ * _For shared-key encryption only._ When encrypting/decrypting, a key is
+ * automatically derived from the shared key. The algorithm used for this
+ * can be defined. This usually doesn't need to be configred. Options include:
+ * - `PB256` PBKDF2 SHA-256 with 10000 iterations (default/recommended)
+ * - `PB384` PBKDF2 SHA-384 with 10000 iterations
+ * - `PB512` PBKDF2 SHA-512 with 10000 iterations
+ * @returns {string}
+ * The Base64-encoded hash.
  */
-export async function encrypt (plaintext, secret) {
-  if (PEM.isPrivateKey(secret)) {
-    throw new Error('Encryption requires a public key (a private key was specified)')
-  }
-
+export async function encrypt (plaintext, passphrase, encryptionAlgorithm, derivationAlgorithm = 'PB256') {
   if (typeof plaintext === 'object') {
     plaintext = JSON.stringify(plaintext)
   }
 
-  if (runtime === 'node' && !cryptography) {
-    if (PEM.isPublicKey(secret)) {
-      const buffer = Buffer.from(plaintext, 'utf8')
-      return nodecrypto.publicEncrypt({
-        key: secret,
-        padding: nodecrypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256'
-      }, buffer).toString('base64')
+  let key
+
+  // If a PEM certificate is provided, use it to encrypt plaintext
+  if (PEM.PEM_PATTERN.test(passphrase)) {
+    const keyinfo = PEM.info(passphrase)
+    encryptionAlgorithm = normalize(encryptionAlgorithm || (keyinfo.algorithm === 'ECDH' ? 'EC256' : 'OAEP256'), Object.assign({}, RSA_OAEP_ALGORITHMS/*, ECDH_ALGORITHMS*/))
+
+    if (encryptionAlgorithm.name === 'RSA-OAEP') {
+      key = await PEM.normalizeKey(passphrase, encryptionAlgorithm, ['encrypt'])
+    // } else {
+    //   key = await PEM.normalizeKey(passphrase, encryptionAlgorithm)
     }
 
-    const iv = nodecrypto.randomBytes(IV_LENGTH)
-    const salt = nodecrypto.randomBytes(SALT_LENGTH)
-    const cipher = nodecrypto.createCipheriv('aes-256-gcm', simpleKey(secret), iv, { authTagLength: AUTH_TAG_LENGTH })
-    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-    const tag = cipher.getAuthTag()
-
-    return Buffer.concat([salt, iv, tag, encrypted]).toString('base64')
-    // return createBase64Cipher(salt, iv, encrypted, tag)
-  }
-
-  // If a PEM public key is specified, use it to encrypt the data
-  if (PEM.isPublicKey(secret)) {
-    const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP', hash: 'SHA-256' })
-    const ciphertext = await cryptography.subtle.encrypt({ name: 'RSA-OAEP' }, pemKey, encoder.encode(plaintext))
-
-    return bufToBase64(ciphertext)
-  }
-
-  const iv = cryptography.getRandomValues(new Uint8Array(IV_LENGTH))
-  const data = encoder.encode(plaintext)
-  const { key, salt } = await Key(secret)
-  const ciphertext = await cryptography.subtle.encrypt({ name: ENCRYPTION_ALGORITHM, iv }, key, data)
-
-  return createBase64Cipher(salt, iv, ciphertext)
-}
-
-/**
- * Decrypts ciphertext encrypted with encrypt() using the supplied secret/key.
- * If a PEM public key is supplied as the secret, RSA-OAEP is used instead of AES-GCM.
- * @warning Some versions of Deno do not support AES-GCM. AES-CBC is used instead.
- * @param   {String} ciphertext
- * Base64 ciphertext to be decrypted.
- * @param   {String} secret
- * Secret or PEM key to encrypt plaintext.
- * @param   {Boolean} [autoparse=true]
- * Automatically parse JSON strings into objects.
- * @returns {String}
- * Decrypted plaintext.
- * @example
- * `const plaintext = await decrypt(ciphertext, 'pw')`
- */
-export async function decrypt (cipher, secret, autoparse = true) {
-  if (PEM.isPublicKey(secret)) {
-    throw new Error('Decryption requires a private key (a public key was specified)')
-  }
-
-  const useNode = runtime === 'node' && !cryptography
-  const isPrivateKey = PEM.isPrivateKey(secret)
-  const encrypted = useNode && !isPrivateKey ? Buffer.from(cipher, 'base64') : base64ToBuf(cipher)
-  const salt = encrypted.slice(0, SALT_LENGTH)
-  const iv = encrypted.slice(salt.byteLength, salt.byteLength + IV_LENGTH)
-  const tag = useNode && !isPrivateKey ? encrypted.slice(salt.byteLength + iv.byteLength, salt.byteLength + iv.byteLength + AUTH_TAG_LENGTH) : null
-  const data = encrypted.slice(salt.byteLength + iv.byteLength + (tag ? tag.byteLength : 0))
-
-  if (useNode) {
-    if (isPrivateKey) {
-      const buffer = Buffer.from(cipher, 'base64')
-      return parse(nodecrypto.privateDecrypt({
-        key: secret,
-        padding: nodecrypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256'
-      }, buffer).toString('utf8'), autoparse)
+    if (key.type === 'private'/* && encryptionAlgorithm.name !== 'ECDH'*/) {
+      throw new Error('encryption requires a public key')
     }
 
-    const decipher = nodecrypto.createDecipheriv('aes-256-gcm', simpleKey(secret), iv, { authTagLength: AUTH_TAG_LENGTH })
-    decipher.setAuthTag(tag)
+    const ciphertext = await crypto.subtle.encrypt(encryptionAlgorithm, key, encoder.encode(plaintext))
 
-    const decrypted = decipher.update(data, 'base64', 'utf-8') + decipher.final('utf-8')
+    return Base64.ArrayBufferToBase64(ciphertext)
+  } else {
+    encryptionAlgorithm = normalize(encryptionAlgorithm || 'GCM256', AES_ALGORITHMS)
+    const { iv } = encryptionAlgorithm
+    const result = await Key(passphrase, null, Object.assign({}, encryptionAlgorithm, { iv }), derivationAlgorithm)
+    const { key, salt } = result
+    const { counter } = result.encryptionAlgorithm
+    const algorithm = Object.assign({}, result.encryptionAlgorithm, { iv, counter })
+    const ciphertext = await crypto.subtle.encrypt(algorithm, key, encoder.encode(plaintext))
 
-    return parse(decrypted, autoparse)
-  }
-
-  // If a PEM private key is specified, use it to decrypt the cipher
-  if (PEM.isPrivateKey(secret)) {
-    const pemKey = await PEM.extractKey(secret, { name: 'RSA-OAEP' })
-    const buffer = await cryptography.subtle.decrypt({ name: 'RSA-OAEP' }, pemKey, base64ToBuf(cipher))
-    const data = new Uint8Array(buffer)
-    return parse(decoder.decode(data), autoparse)
-  }
-
-  const { key } = await Key(secret, salt)
-  const decrypted = await cryptography.subtle.decrypt({ name: ENCRYPTION_ALGORITHM, iv }, key, data).catch(e => console.log(`e: ${e.message}`))
-
-  return parse(decoder.decode(decrypted), autoparse)
-}
-
-function parse (content, autoparse = true) {
-  if (!autoparse) {
-    return content
-  }
-
-  try {
-    return JSON.parse(content)
-  } catch (e) {
-    return content
+    return Base64.createBase64Cipher(salt, iv || counter, ciphertext)
   }
 }
 
-/**
- * Identify the encoding type of a secret/key
- * @param   {String} secret
- * Secret or PEM key to encrypt plaintext.
- * @returns {String}
- * Returns the encryption hash type, such as `rsa256oaep` or `aes256cbc`.
- */
-export const encryptionAlgorithm = secret => PEM.isKey(secret) ? 'rsa256oaep' : ENCRYPTION_ALGORITHM.toLowerCase().replace('-', '256')
+export async function decrypt (cipher, passphrase, encryptionAlgorithm, derivationAlgorithm = 'PB256', autoparse = true) {
+  const encrypted = Base64.Base64ToArrayBuffer(cipher)
 
-// Older Node.js only - the md5 hash produces a 32 character hash from any
-// encryption key. This is not designed to be a stored secret.
-const simpleKey = secret => nodecrypto.createHash('md5').update(secret, 'utf8').digest('hex')
+  let result
+  if (PEM.PEM_PATTERN.test(passphrase)) {
+    encryptionAlgorithm = normalize(encryptionAlgorithm || 'OAEP256', RSA_OAEP_ALGORITHMS, ['decrypt'])
+    const key = await PEM.normalizeKey(passphrase, encryptionAlgorithm, ['decrypt'])
+    const buffer = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, key, encrypted)
+    result = new Uint8Array(buffer)
+  } else {
+    encryptionAlgorithm = normalize(encryptionAlgorithm || 'GCM256', AES_ALGORITHMS)
+    derivationAlgorithm = normalize(derivationAlgorithm, DERIVE_ALGORITHMS)
 
-async function generateKeyPair (algorithm, type = '') {
-  const keypair = await cryptography.subtle.generateKey(
-    algorithm,
-    true,
-    ['sign', 'verify']
+    const salt = encrypted.slice(0, SALT_LENGTH)
+    const iv = encrypted.slice(salt.byteLength, salt.byteLength + (encryptionAlgorithm?.iv || encryptionAlgorithm?.counter).length)
+    const data = encrypted.slice(salt.byteLength + iv.byteLength)
+    const keydata = await Key(passphrase, salt, Object.assign({}, encryptionAlgorithm, { iv }), derivationAlgorithm)
+    const algorithm = Object.assign({}, keydata.encryptionAlgorithm, { iv, counter: iv })
+
+    result = await crypto.subtle.decrypt(
+      algorithm,
+      keydata.key,
+      data
+    )
+  }
+
+  result = decoder.decode(result)
+
+  if (autoparse) {
+    try {
+      return JSON.parse(result)
+    } catch (e) { }
+  }
+
+  return result
+}
+
+async function Key (passphrase, salt, encryptionAlgorithm = 'GCM256', derivationAlgorithm = 'PB256') {
+  derivationAlgorithm = normalize(derivationAlgorithm, DERIVE_ALGORITHMS)
+  encryptionAlgorithm = normalize(encryptionAlgorithm, ENCRYPTION_ALGORITHMS)
+  salt = salt || crypto.getRandomValues(new Uint8Array(SALT_LENGTH))
+
+  derivationAlgorithm.salt = salt
+
+  const secret = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(passphrase),
+    derivationAlgorithm,
+    false,
+    ['deriveKey', 'deriveBits']
   )
 
-  const privateKey = await PEM.encodePrivateKey(keypair.privateKey, type)
-  const publicKey = await PEM.encodePublicKey(keypair.publicKey, type)
-
-  return { privateKey, publicKey }
-}
-
-async function Key (passphrase, salt, hash = 'SHA-256') {
-  salt = salt || cryptography.getRandomValues(new Uint8Array(SALT_LENGTH))
-  const secret = await cryptography.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey', 'deriveBits'])
-  const key = await cryptography.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 10000, hash },
+  const key = await crypto.subtle.deriveKey(
+    derivationAlgorithm,
     secret,
-    { name: ENCRYPTION_ALGORITHM, length: parseInt(hash.split('-').pop(), 10) },
+    encryptionAlgorithm,
     false,
     ['encrypt', 'decrypt']
   )
 
-  return { key, salt }
+  return { key, salt, encryptionAlgorithm, derivationAlgorithm }
 }
 
-const crypto = {
-  encrypt,
-  decrypt,
-  encryptionAlgorithm,
-  generateKeys,
-  generateRSAKeyPair,
-  generateECDSAKeyPair,
-  generateECKeyPair,
-  PEM,
-  sign,
-  verify,
-  HOTP,
-  TOTP,
-  base32,
-  JWT
+function normalizeData(data) {
+  switch (typeof data) {
+    // Autoconvert data object to string
+    case 'object':
+      return JSON.stringify(data)
+    default:
+      return data
+  }
 }
+
+const { HOTP, TOTP } = OTP
 
 export {
-  crypto as default,
+  RSA,
+  ECDSA,
+  // ECDH,
+  HMAC,
   PEM,
+  Base64,
+  Base32,
+  OTP,
   HOTP,
   TOTP,
-  base32,
-  JWT
+  // JWT
 }

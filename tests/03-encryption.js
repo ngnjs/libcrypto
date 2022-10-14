@@ -1,51 +1,83 @@
 import test from 'tappedout'
-import NGN from 'ngn'
-import crypto from '@ngnjs/libcrypto'
+import {
+  createEncryptionKeypair,
+  createKeypairPEM,
+  encrypt,
+  decrypt
+} from '@ngnjs/libcrypto'
 
-const x = NGN.runtime // Prevent test suite import from conflicting with plugin in Node.js
+const runtime = globalThis.process !== undefined ? 'node' : (globalThis.hasOwnProperty('Deno') ? 'deno' : 'browser') // eslint-disable-line no-prototype-builtins
+const SECRET = 'secret12'
 
-test('Reversible Encryption/Decryption', async t => {
-  const encryptionKey = 'my secret'
-  const source = 'crypto makes things hard to read'
-  const encrypted = await crypto.encrypt(source, encryptionKey).catch(t.abort)
-  t.ok(source !== encrypted, 'Encrypted content is obfuscated')
-
-  const decrypted = await crypto.decrypt(encrypted, encryptionKey).catch(t.abort)
-  t.expect(source, decrypted, 'Decryption converts cipher to original content')
-
-  const encObj = await crypto.encrypt({ source }, encryptionKey).catch(t.abort)
-  t.expect('string', typeof encObj, 'Encrypted object converted to string')
-
-  const decObj = await crypto.decrypt(encObj, encryptionKey).catch(t.abort)
-
-  t.expect('object', typeof decObj, 'Decryption yields an object')
-  t.expect(source, decObj.source, 'Decrypted object matches original object')
+test('Default Asymmetric Key Encryption/Decryption (RSA-OAEP keypair)', async t => {
+  const { encryptionKey, decryptionKey } = await createEncryptionKeypair()
+  const content = 'crypto makes things safe'
+  const encrypted = await encrypt(content, encryptionKey)
+  const decrypted = await decrypt(encrypted, decryptionKey)
+  t.expect(content, decrypted, 'Asymmetric keypair encrypted/decrypted value matches original input')
 
   t.end()
 })
 
-test('Public Key Encryption/Private Key Decryption', async t => {
-  if (NGN.runtime === 'deno') {
-    t.pass('KEY-BASED ENCRYPTION NOT YET SUPPORTED IN DENO')
+// const ecdhlist = ['EC256', 'EC384']
+// if (runtime !== 'deno') {
+//   ecdhlist.push('EC512')
+// }
+// for (const algorithm of ecdhlist) {
+//   test.only('ECDH Asymmetric Key Encryption/Decryption', async t => {
+//     const { encryptionKey, decryptionKey } = await createEncryptionKeypair(algorithm)
+//     console.log({ encryptionKey, decryptionKey })
+//     const content = 'crypto makes things safe'
+//     const encrypted = await encrypt(content, encryptionKey)
+//     const decrypted = await decrypt(encrypted, decryptionKey)
+//     t.expect(content, decrypted, `${algorithm} asymmetric keypair encrypted/decrypted value matches original input`)
+
+//     t.end()
+//   })
+// }
+
+const keytypes = ['OAEP256', 'OAEP384', 'OAEP512']
+for (const kt of keytypes) {
+  test(`RSA-OAEP SHA-${kt.replace(/[^0-9]+/, '')} (${kt}) Asymmetric Key Encryption/Decryption`, async t => {
+    const { encryptionKey, decryptionKey } = await createEncryptionKeypair()
+    const content = 'crypto makes things safe'
+    const encrypted = await encrypt(content, encryptionKey)
+    const decrypted = await decrypt(encrypted, decryptionKey)
+    t.expect(content, decrypted, `${kt} asymmetric keypair encrypted/decrypted value matches original input`)
+
     t.end()
-    return
-  }
+  })
+}
 
-  const keypair = await crypto.generateRSAKeyPair().catch(t.abort)
-  const { publicKey, privateKey } = keypair
-  const source = 'crypto makes things hard to read'
-  const encrypted = await crypto.encrypt(source, publicKey).catch(t.abort)
-  t.ok(source !== encrypted, 'Public key encrypted content is obfuscated')
-
-  const decrypted = await crypto.decrypt(encrypted, privateKey).catch(t.abort)
-  t.expect(source, decrypted, 'Private key decryption converts cipher to original content')
-
-  const encObj = await crypto.encrypt({ source }, publicKey).catch(t.abort)
-  t.expect('string', typeof encObj, 'Pub/Priv key encrypted object converted to string')
-
-  const decObj = await crypto.decrypt(encObj, privateKey).catch(t.abort)
-  t.expect('object', typeof decObj, 'Pub/Priv key decryption yields an object')
-  t.expect(source, decObj.source, 'Pub/Priv key decrypted object matches original object')
+test('Default Symmetric Key Encryption/Decryption', async t => {
+  const secret = 'Encrypti0nKey'
+  const content = 'crypto makes things safe'
+  const encrypted = await encrypt(content, secret)
+  const decrypted = await decrypt(encrypted, secret)
+  t.expect(content, decrypted, 'Symmetric key encrypted/decrypted value matches original input')
 
   t.end()
 })
+
+const aestypes = ['GCM128', 'GCM192', 'GCM256', 'CBC128', 'CBC192', 'CBC256', 'CTR128']
+const derivationtypes = ['PB256', 'PB384', 'PB512'] //, 'HK256', 'HK384', 'HK512', 'EC256', 'EC384']
+// if (runtime !== 'deno') {
+//   derivationtypes.push('EC512')
+// }
+for (const at of aestypes) {
+  test(`${at} Symmetric Key Encryption/Decryption`, async t => {
+    const secret = 'Encrypti0nKey'
+    const content = 'crypto makes things safe'
+    const encrypted = await encrypt(content, secret, at)
+    const decrypted = await decrypt(encrypted, secret, at)
+    t.expect(content, decrypted, `${at} symmetric key encrypted/decrypted value matches original input using default derivation algorithm`)
+
+    for (const dt of derivationtypes) {
+      const encrypted = await encrypt(content, secret, at, dt)
+      const decrypted = await decrypt(encrypted, secret, at, dt)
+      t.expect(content, decrypted, `${at} symmetric key encrypted/decrypted value matches original input using "${dt}" derivation algorithm`)
+    }
+
+    t.end()
+  })
+}

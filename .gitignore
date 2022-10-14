@@ -1,5 +1,7 @@
 *.log
 *.old
+old
+wip
 .*
 _*
 !.github

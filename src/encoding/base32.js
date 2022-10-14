@@ -1,3 +1,5 @@
+import { ArrayBufferToString } from "./common.js"
+
 // Modified from https://github.com/beatgammit/base64-js
 // Copyright (c) 2014 Jameson Little. MIT License.
 
@@ -10,7 +12,7 @@ code.split('').forEach((v, i) => {
   revLookup[code.charCodeAt(i)] = i
 })
 
-function _getPadLen (placeHoldersLen) {
+function getPadLen (placeHoldersLen) {
   const maybeLen = placeHolderPadLookup[placeHoldersLen]
   if (typeof maybeLen !== 'number') {
     throw new Error('Invalid pad length')
@@ -18,13 +20,8 @@ function _getPadLen (placeHoldersLen) {
   return maybeLen
 }
 
-// function byteLength (b32) {
-//   const [validLen, placeHoldersLen] = getLens(b32)
-//   return _byteLength(validLen, placeHoldersLen)
-// }
-
-function _byteLength (validLen, placeHoldersLen) {
-  return ((validLen + placeHoldersLen) * 5) / 8 - _getPadLen(placeHoldersLen)
+function byteLength (validLen, placeHoldersLen) {
+  return ((validLen + placeHoldersLen) * 5) / 8 - getPadLen(placeHoldersLen)
 }
 
 function encodeBase32Chunk (uint8, start, end) {
@@ -75,7 +72,7 @@ function getLens (b32) {
  * @param {Uint8Array} buffer
  * @returns {string}
  */
-export function bufToBase32 (uint8) {
+export function Uint8ArrayToBase32 (uint8) {
   let tmp
   const extraBytes = uint8.byteLength % 5
   const parts = []
@@ -149,11 +146,11 @@ export function bufToBase32 (uint8) {
  * @param {string} data
  * @returns {Uint8Array}
  */
-export function base32ToBuf (b32) {
+export function Base32ToUint8Array (b32) {
   let tmp
   let curByte = 0
   const [validLen, placeHoldersLen] = getLens(b32)
-  const arr = new Uint8Array(_byteLength(validLen, placeHoldersLen))
+  const arr = new Uint8Array(byteLength(validLen, placeHoldersLen))
 
   // if there are placeholders, only get up to the last complete 8 chars
   const len = placeHoldersLen > 0 ? validLen - 8 : validLen
@@ -214,3 +211,6 @@ export function base32ToBuf (b32) {
 
   return arr
 }
+
+export const encode = str => Uint8ArrayToBase32(Uint8Array.from(Array.from(str).map(l => l.charCodeAt(0))))
+export const decode = input => ArrayBufferToString(Base32ToUint8Array(input))

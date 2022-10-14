@@ -1,20 +1,21 @@
-import { cryptography, runtime, stringToArrayBuffer, arrayBufferToString } from './common.js'
-import { base32ToBuf, bufToBase32 } from './encoding/base32.js'
-import { pad, truncate, zeropad, createNodeHMAC } from './hmac.js'
-
-const base32encode = str => bufToBase32(Uint8Array.from(Array.from(str).map(l => l.charCodeAt(0))))
-const base32decode = input => arrayBufferToString(base32ToBuf(input))
-export const base32 = { encode: base32encode, decode: base32decode }
+import { ArrayBufferToString, StringToArrayBuffer } from '../encoding/common.js'
+import { Base32ToUint8Array, Uint8ArrayToBase32 } from '../encoding/base32.js'
+import { pad, truncate } from '../keys/hmac.js'
 
 /**
  * HMAC-based OTP
  * @param {string} secret
- * UTF-8 secret/key used to create the OTP
+ * UTF-8 secret/key used to create the OTP. The number of characters
+ * must be evenly divisible by 8. If it is not, the secret will be padded
+ * with the equal sign (`=`). For example, a password called `secret` is
+ * only 6 characters. It will be automatically padded as `secret==`. Similarly,
+ * a secret of `thesecret` is 9 characters. It will be padded with 7 additional
+ * characters (total 16) to be evenly divisible by 8 (`thesecret=======`).
  * @param {object} options
  * Configuration options.
  * @param {number} [options.counter=0]
  * The counter to base the OTP on
- * @param {string} [options.algorithm=SHA-1] (SHA-1, SHA-256, SHA-384, SHA-512)
+ * @param {string} [options.hash=SHA-1] (SHA-1, SHA-256, SHA-384, SHA-512)
  * The algorithm used to generate the OTP.
  * @param {number} [options.digits=6]
  * Number of digits to produce for the final TOTP
@@ -22,32 +23,30 @@ export const base32 = { encode: base32encode, decode: base32decode }
  * Returns a string of numbers with the configured number of digits.
  */
 export async function HOTP (secret, cfg = {}) {
-  const algorithm = cfg.algorithm || 'SHA-1'
-  const algo = algorithm.trim().replace('-', '').toLowerCase()
+  const hash = cfg.hash || 'SHA-1'
   const counter = cfg.counter || 0
   const digits = cfg.digits || 6
 
-  if (runtime === 'node' && !cryptography) {
-    const hmac = createNodeHMAC(secret, counter, algo)
-    return zeropad(truncate(hmac, digits), digits)
+  while (secret.length % 8 !== 0) {
+    secret += '='
   }
 
-  secret = stringToArrayBuffer(secret)
+  secret = StringToArrayBuffer(secret)
 
-  const key = await cryptography.subtle.importKey(
+  const key = await crypto.subtle.importKey(
     'raw',
     secret,
-    { name: 'HMAC', hash: { name: algorithm } },
+    { name: 'HMAC', hash: { name: hash } },
     false,
     ['sign']
   )
 
-  const hmac = new Uint8Array(await cryptography.subtle.sign('HMAC', key, pad(counter)))
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', key, pad(counter)))
 
   // HOTP(K, C) = truncate(HMAC(K, C))
   const num = truncate(hmac)
 
-  // return 6 digits, padded with leading zeros
+  // return 6 digits (default), padded with leading zeros
   return num.toString().padStart(digits, '0').slice(0 - digits)
 }
 
