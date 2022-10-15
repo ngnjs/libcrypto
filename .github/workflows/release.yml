@@ -127,7 +127,8 @@ jobs:
         if: steps.create_release.outputs.id != ''
         run: |
           npm run bundle:module
-          cp -rf .dist/@ngnjs/libcrypto ./dist
+          cp -rf ./.dist/@ngnjs/libcrypto ./dist
+          ls -l ./dist
 
         # Upload tarballs to the release.
       - name: Upload Release Artifacts
