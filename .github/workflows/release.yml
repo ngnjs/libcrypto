@@ -150,7 +150,7 @@ jobs:
 
       - name: Rollback Release
         if: failure() && steps.create_release.outputs.id != ''
-        uses: author/action-rollback@stable
+        uses: author/action-rollback@master
         with:
           tag: ${{ steps.autotagger.outputs.tagname }}
         env:
