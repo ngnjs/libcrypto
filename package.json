@@ -73,7 +73,7 @@
   },
   "devDependencies": {
     "tappedout": "^1.1.8",
-    "@quikdev/js": "^1.0.0-beta.6"
+    "@quikdev/js": "^1.0.0-beta.7"
   },
   "scripts": {
     "test": "npm run build && quikdev-js test --platform deno --verbose --output pretty --external crypto --external os --sourcemap --entry ./tests",
@@ -105,8 +105,8 @@
     "old:update": "npm update --save --save-dev --save-optional",
     "old:ci": "dev test --mode ci --peer -rt browser tests/*.js",
     "old:ws": "dev ws",
-    "clean": "quikdev-js clean ./.dist/@ngnjs/libcrypto",
-    "bundle:module": "quikdev-js release --source ./.dist/@ngnjs/libcrypto --target ./.dist"
+    "clean": "quikdev-js clean ./.dist",
+    "bundle:module": "quikdev-js release --source ./.dist/@ngnjs/libcrypto --outdir ./.dist"
   },
   "quikdev-js": {
     "replace": {
