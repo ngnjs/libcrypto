@@ -10,7 +10,7 @@ jobs:
     name: 'Release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Get npm cache directory
         id: npm-cache-dir
@@ -18,7 +18,7 @@ jobs:
           echo "::set-output name=dir::$(npm config get cache)"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: '16'
 
@@ -53,42 +53,6 @@ jobs:
             rm -rf docker-cache
           fi
 
-      # - name: Setup Build Tooling
-      #   id: setup
-      #   run: |
-      #     base=$(curl -L -s 'https://registry.hub.docker.com/v2/repositories/author/dev-base/tags?page_size=1'|jq '."results"[]["name"]')
-      #     base=$(sed -e 's/^"//' -e 's/"$//' <<<"$base")
-      #     echo Retrieving author/dev/dev-base:$base
-      #     docker pull author/dev-base:$base
-
-      #     deno=$(curl -L -s 'https://registry.hub.docker.com/v2/repositories/author/dev-deno/tags?page_size=1'|jq '."results"[]["name"]')
-      #     deno=$(sed -e 's/^"//' -e 's/"$//' <<<"$deno")
-      #     echo Retrieving author/dev/dev-deno:$deno
-      #     docker pull author/dev-deno:$deno
-
-      #     browser=$(curl -L -s 'https://registry.hub.docker.com/v2/repositories/author/dev-browser/tags?page_size=1'|jq '."results"[]["name"]')
-      #     browser=$(sed -e 's/^"//' -e 's/"$//' <<<"$browser")
-      #     echo Retrieving author/dev/dev-browser:$browser
-      #     docker pull author/dev-browser:$browser
-
-      #     node=$(curl -L -s 'https://registry.hub.docker.com/v2/repositories/author/dev-node/tags?page_size=1'|jq '."results"[]["name"]')
-      #     node=$(sed -e 's/^"//' -e 's/"$//' <<<"$node")
-      #     echo Retrieving author/dev/dev-node:$node
-      #     docker pull author/dev-node:$node
-
-      #     # node -e "const p=new Set(Object.keys(require('./package.json').peerDependencies));p.delete('@author.io/dev');console.log('npm i ' + Array.from(p).join(' '))"
-      #     version=$(npm show @author.io/dev version)
-      #     echo $version
-      #     npm i -g @author.io/dev@$version
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Test
-      #   if: success()
-      #   run: |
-      #     dev -v
-      #     npm run ci
-
       - name: Build & Test
         if: success()
         run: |
@@ -111,12 +75,11 @@ jobs:
       - name: Release
         id: create_release
         if: steps.autotagger.outputs.tagname != ''
-        uses: actions/create-release@v1.0.0
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.autotagger.outputs.tagname }}
-          release_name: ${{ steps.autotagger.outputs.tagname }}
           body: ${{ steps.autotagger.outputs.tagmessage }}
           draft: false
           prerelease: env.IS_PRERELEASE != ''
