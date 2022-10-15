@@ -143,8 +143,8 @@ jobs:
         if: steps.autotagger.outputs.tagname != ''
         uses: author/action-publish@master
         with:
-          scan: ./dist
-          prerelease-dist-tag: next
+          scan: ./.dist
+          prerelease_dist_tag: next
         env:
           REGISTRY_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}
 
