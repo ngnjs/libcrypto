@@ -1,7 +1,7 @@
 // Identify JS runtime and version when possible
 let runtime = globalThis.process !== undefined ? 'node' : (globalThis.hasOwnProperty('Deno') ? 'deno' : 'browser') // eslint-disable-line no-prototype-builtins
 let runtimeVersion
-const brands = globalThis?.navigator?.userAgentData?.brands || []
+const brands = Array.from(globalThis?.navigator?.userAgentData?.brands || [])
 
 switch (runtime) {
   case 'node':
