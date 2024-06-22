@@ -10,7 +10,7 @@ jobs:
     name: 'Release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Get npm cache directory
         id: npm-cache-dir
@@ -18,12 +18,12 @@ jobs:
           echo "::set-output name=dir::$(npm config get cache)"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Setup npm Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: npm-cache # use this to check for `cache-hit` ==> if: steps.npm-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
@@ -37,7 +37,7 @@ jobs:
           npm install
 
       - name: Setup Docker Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: docker-cache
         with:
           path: docker-cache
