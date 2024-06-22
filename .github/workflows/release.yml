@@ -34,6 +34,7 @@ jobs:
       - name: Install Dependencies
         if: steps.npm-cache.outputs.cache-hit != 'true'
         run: |
+          npm install -g @quikdev/js
           npm install
 
       - name: Setup Docker Cache
