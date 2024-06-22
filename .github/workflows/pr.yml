@@ -10,7 +10,7 @@ jobs:
     name: 'Run Tests'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         name: Checkout Code
 
       - name: List Directory Contents (for Troubleshooting)
@@ -18,7 +18,7 @@ jobs:
           pwd
           ls -l
 
-      - uses: actions/setup-node@v1
+      - uses: actions/setup-node@v4
         name: Setup Node.js
         with:
           node-version: '20'
@@ -31,7 +31,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         name: Establish Docker Cache
         id: cache
         with:
