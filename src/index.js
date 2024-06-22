@@ -1,4 +1,4 @@
-import * as PEM from './encoding/pem.js'
+cretimport * as PEM from './encoding/pem.js'
 import * as Base64 from './encoding/base64.js'
 import * as Base32 from './encoding/base32.js'
 import * as RSA from './keys/rsa.js'
@@ -377,7 +377,7 @@ function normalizeData(data) {
   }
 }
 
-const { HOTP, TOTP } = OTP
+const { HOTP, TOTP, generateSecret } = OTP
 
 export {
   RSA,
@@ -390,5 +390,6 @@ export {
   OTP,
   HOTP,
   TOTP,
+  generateOTPSecret: generateSecret,
   // JWT
 }
