@@ -74,3 +74,23 @@ export async function TOTP (secret, cfg = {}) {
 
   return HOTP(secret, cfg)
 }
+
+/**
+ * Generate a TOTP-compliant UTF-8 secret.
+ * @param {number} length (16, 32)
+ * The length of the secret.
+ * @returns {boolean}
+ * Returns a randomly generated UTTF-8 string
+ */
+export function generateSecret(length = 16) {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_+<>'
+    let randomCode = ''
+
+    // Generate random characters
+    for (let i = 0; i < length; i++) {
+        const randomIndex = Math.floor(Math.random() * characters.length)
+        randomCode += characters.charAt(randomIndex)
+    }
+
+    return randomCode
+}
